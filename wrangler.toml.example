@@ -1,0 +1,10 @@
+name = "taqss-dashboard-api"
+main = "worker.js"
+compatibility_date = "2026-09-21"
+
+[vars]
+STATION_ID = "IMEDIN86"
+STATION_API_BASE = "https://mahatta-api.muala99.workers.dev"
+
+# لا تضع المفتاح هنا. أضفه كـ Secret:
+# npx wrangler secret put WU_API_KEY

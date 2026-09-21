@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <title>طقس داشبورد</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌡️</text></svg>">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="styles.css?v=0.16">
+</head>
+<body>
+  <nav class="tabs" aria-label="التبويبات الرئيسية">
+    <button class="tab active" data-tab="weather">🌡️ الطقس</button>
+    <button class="tab" data-tab="history">📈 التاريخ</button>
+    <button class="tab" data-tab="radar">🌧️ الرادار</button>
+    <button class="tab" data-tab="markets">💹 الأسعار</button>
+    <button class="tab" data-tab="prayer">🕌 أوقات الصلاة</button>
+  </nav>
+
+  <main>
+    <section id="panel-weather" class="panel active">
+      <div class="weather-intro">
+        <div class="weather-location-line">
+          <p class="identity weather-location">📍 <strong>الموقع:</strong> <span id="stationLocation">—</span></p>
+          <span class="info-wrap">
+            <button id="weatherInfoButton" class="info-button" type="button" aria-label="معلومات مصدر الطقس" aria-expanded="false">ⓘ</button>
+            <span id="weatherInfoBubble" class="info-bubble weather-info-bubble" role="tooltip" hidden>المصدر: محطة طقس PWS مرتبطة بمنصة Weather Underground (WU)</span>
+          </span>
+        </div>
+        <p id="stationConnection" class="station-connection"><span class="connection-dot"></span><span class="connection-text">جارٍ التحقق من اتصال المحطة…</span></p>
+        <p id="weatherStatus" class="status" hidden></p>
+      </div>
+      <dl id="weatherData" class="rows weather-rows"></dl>
+    </section>
+
+    <section id="panel-history" class="panel" hidden>
+      <label for="chartSelect">الشارت</label>
+      <select id="chartSelect">
+        <option value="today-temp">الحرارة اليوم</option>
+        <option value="year-temp-rain">الحرارة والمطر سنويًا</option>
+        <option value="month-temp-dew">متوسط الحرارة ونقطة الندى شهريًا</option>
+      </select>
+      <div id="chartPeriodNav" class="period-nav" hidden aria-label="التنقل بين الفترات">
+        <button id="chartPrev" type="button">السابق</button>
+        <strong id="chartPeriodLabel">—</strong>
+        <button id="chartNext" type="button">التالي</button>
+      </div>
+      <p id="chartStatus" class="status"></p>
+      <div class="chart-wrap"><canvas id="historyChart"></canvas></div>
+    </section>
+
+    <section id="panel-radar" class="panel" hidden>
+      <div id="weatherMap" class="map-shell">
+        <div id="weatherLeafletMap"></div>
+        <button id="radarFullscreenButton" class="map-button fullscreen-button" type="button" aria-label="ملء الشاشة">⛶</button>
+        <div id="radarPlaybackControls" class="radar-controls" hidden>
+          <button type="button" data-radar-action="center" title="موقع المحطة">⌖</button>
+          <button type="button" data-radar-action="prev" title="السابق">‹</button>
+          <button type="button" data-radar-action="play" title="تشغيل">▶</button>
+          <button type="button" data-radar-action="next" title="التالي">›</button>
+          <span id="radarControlTime">—</span>
+        </div>
+        <div id="radarMapMessage" class="map-message">جارٍ تحميل الرادار…</div>
+      </div>
+      <p class="status">الخريطة مركزة على موقع المحطة.</p>
+    </section>
+
+    <section id="panel-markets" class="panel" hidden>
+      <div id="marketsData"></div>
+      <p id="marketsStatus" class="status markets-footer">جارٍ جلب الأسعار…</p>
+    </section>
+
+    <section id="panel-prayer" class="panel" hidden>
+      <section class="simple-section prayer-section">
+        <div class="section-heading-line">
+          <h2>أوقات الصلاة (أبيار الماشي)</h2>
+          <span class="info-wrap">
+            <button id="prayerInfoButton" class="info-button" type="button" aria-label="معلومات أوقات الصلاة" aria-expanded="false">ⓘ</button>
+            <span id="prayerInfoBubble" class="info-bubble" role="tooltip" hidden>حسب تقويم أم القرى</span>
+          </span>
+        </div>
+        <p id="prayerDateSummary" class="date-summary">—</p>
+        <p id="prayerStatus" class="status">جارٍ جلب الأوقات…</p>
+        <dl id="prayerData" class="rows prayer-rows"></dl>
+      </section>
+
+      <section class="simple-section moon-section">
+        <h2 class="moon-heading">القمر <span id="moonPhase" class="moon-phase">—</span></h2>
+        <dl id="moonData" class="rows"></dl>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="config.js?v=0.16"></script>
+  <script src="markets-config.js?v=0.16"></script>
+  <script src="app.js?v=0.16"></script>
+  <script src="radar.js?v=0.16"></script>
+</body>
+</html>
