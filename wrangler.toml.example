@@ -8,3 +8,13 @@ STATION_API_BASE = "https://mahatta-api.muala99.workers.dev"
 
 # لا تضع المفتاح هنا. أضفه كـ Secret:
 # npx wrangler secret put WU_API_KEY
+
+# إدارة قائمة الأسهم من الواجهة تكتب markets-config.js في GitHub.
+GITHUB_OWNER = "muala-code"
+GITHUB_REPO = "taqss-dashboard"
+GITHUB_BRANCH = "main"
+GITHUB_MARKETS_PATH = "markets-config.js"
+
+# Secrets مطلوبة لزرّي + و − (لا تضع القيم هنا):
+# npx wrangler secret put GITHUB_TOKEN
+# npx wrangler secret put MARKETS_ADMIN_KEY

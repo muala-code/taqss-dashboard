@@ -203,3 +203,59 @@ body.radar-pseudo-fullscreen { overflow: hidden; }
 .weather-rows > div.rain-row dd {
   font-weight: 600;
 }
+
+
+/* v0.18 — weather/current temperature */
+.current-temperature-row {
+  margin-inline: -.35rem;
+  padding-inline: .35rem !important;
+  border-radius: .65rem;
+  transition: background-color .35s ease, box-shadow .35s ease;
+}
+.current-temperature-value { font-size: 1.14rem; font-weight: 800; transition: color .35s ease, transform .35s ease; }
+.current-temperature-row.temp-cold .current-temperature-value { color: #2563eb; }
+.current-temperature-row.temp-mild .current-temperature-value { color: #15803d; }
+.current-temperature-row.temp-hot .current-temperature-value { color: #c2410c; }
+.current-temperature-row.temp-very-hot .current-temperature-value { color: #b91c1c; }
+.current-temperature-row.temp-cold { background: color-mix(in srgb, #2563eb 7%, transparent); }
+.current-temperature-row.temp-mild { background: color-mix(in srgb, #15803d 7%, transparent); }
+.current-temperature-row.temp-hot { background: color-mix(in srgb, #c2410c 7%, transparent); }
+.current-temperature-row.temp-very-hot { background: color-mix(in srgb, #b91c1c 7%, transparent); }
+.temperature-rise .current-temperature-value, .temperature-fall .current-temperature-value { animation: temperature-pop .65s ease; }
+@keyframes temperature-pop { 0% { transform: scale(1); } 45% { transform: scale(1.12); } 100% { transform: scale(1); } }
+
+/* v0.18 — markets */
+.market-group-heading { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin: 0 0 .3rem; }
+.market-group-heading h3 { margin: 0; }
+.market-add-button, .market-remove-button {
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  background: color-mix(in srgb, Canvas 92%, currentColor 8%);
+  color: inherit; border-radius: 999px; line-height: 1; cursor: pointer;
+}
+.market-add-button { width: 2rem; height: 2rem; font-size: 1.3rem; font-weight: 700; }
+.market-remove-button { width: 1.7rem; height: 1.7rem; font-size: 1.1rem; padding: 0; }
+.market-item { border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent); }
+.market-item .market-row { border-bottom: 0; }
+.market-row.index-row { grid-template-columns: minmax(5.5rem, 1fr) auto auto; }
+.market-row.stock-row { grid-template-columns: minmax(5.5rem, 1fr) auto auto auto auto; cursor: pointer; }
+.market-row.stock-row:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.market-index-value { font-weight: 800; }
+.market-details {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem .8rem;
+  padding: .15rem .15rem .7rem; font-size: .78rem;
+}
+.market-details[hidden] { display: none; }
+.market-details span { display: flex; justify-content: space-between; gap: .5rem; }
+.market-details small { opacity: .65; }
+.market-details strong { direction: ltr; font-weight: 600; }
+.market-action-note { grid-column: 1 / -1; margin: .15rem 0 0; opacity: .68; }
+.market-row.flash-up { animation: market-flash-up .72s ease-out; }
+.market-row.flash-down { animation: market-flash-down .72s ease-out; }
+@keyframes market-flash-up { 0% { background: color-mix(in srgb, #16a34a 22%, transparent); } 100% { background: transparent; } }
+@keyframes market-flash-down { 0% { background: color-mix(in srgb, #dc2626 20%, transparent); } 100% { background: transparent; } }
+@media (max-width: 470px) {
+  .market-row { gap: .38rem; }
+  .market-row.stock-row { grid-template-columns: minmax(4.4rem, 1fr) auto auto auto 1.7rem; }
+  .market-row .num { font-size: .82rem; }
+  .market-row > span:first-child { font-size: .9rem; }
+}

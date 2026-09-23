@@ -1,7 +1,9 @@
-// لإضافة سهم: انسخ سطرًا، غيّر الرمز والاسم، واترك الفاصلة في نهاية السطر.
-// للإخفاء مؤقتًا: غيّر enabled إلى false.
+// القائمة الأساسية للأسعار.
+// الأسهم يمكن إضافتها أو تعطيلها من شاشة «الأسعار»؛ العامل يحدّث هذا الملف في GitHub عند تفعيل إدارة القائمة.
 window.TAQSS_MARKETS = [
-  { symbol: "^TASI.SR", name: "تاسي", category: "index", enabled: true },
+  { symbol: "^TASI.SR", name: "TASI", category: "index", enabled: true },
+  { symbol: "^DJI", name: "DJI", category: "index", enabled: true },
+  { symbol: "^IXIC", name: "NASDAQ", category: "index", enabled: true },
 
   { symbol: "GC=F", name: "الذهب", category: "commodity", enabled: true },
   { symbol: "SI=F", name: "الفضة", category: "commodity", enabled: true },

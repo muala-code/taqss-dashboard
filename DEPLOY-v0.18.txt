@@ -1,0 +1,22 @@
+طقس داشبورد v0.18 — خطوات التحديث
+==================================
+
+1) استبدل ملفات المشروع في E:\taqss-dashboard بملفات هذه الحزمة، ثم اختبر محليًا عبر start-local.bat أو py server.py.
+
+2) حدّث عامل Cloudflare taqss-dashboard-api باستخدام worker.js الموجود في الحزمة.
+
+3) لتفعيل زر (+) و(−) بحيث يكتبان markets-config.js فعليًا في مستودع GitHub muala-code/taqss-dashboard:
+   - أضف Secret باسم GITHUB_TOKEN، وقيمته توكن GitHub له صلاحية كتابة Contents لهذا المستودع فقط.
+   - أضف Secret باسم MARKETS_ADMIN_KEY، واختر له رمز إدارة خاصًا بك.
+   - لا تضع أيًا من السرّين داخل config.js أو ملفات GitHub Pages.
+
+4) متغيرات العامل المستخدمة افتراضيًا:
+   GITHUB_OWNER=muala-code
+   GITHUB_REPO=taqss-dashboard
+   GITHUB_BRANCH=main
+   GITHUB_MARKETS_PATH=markets-config.js
+   ويمكن ضبطها من Cloudflare Variables عند الحاجة. المثال موجود في wrangler.toml.example.
+
+5) عند أول ضغط على (+) أو (−) في جلسة المتصفح سيطلب الموقع MARKETS_ADMIN_KEY. يحفظه للجلسة فقط، ولا يكتبه في المشروع.
+
+6) المؤشرات TASI / DJI / NASDAQ تتحدث كل 60 ثانية أثناء فتح تبويب الأسعار، وتعرض قيمة النقاط ونسبة التغير فقط.

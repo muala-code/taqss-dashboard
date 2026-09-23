@@ -9,8 +9,8 @@ const RAIN_START_MONTH = 7;
 function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET,HEAD,POST,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Key',
     'X-Content-Type-Options': 'nosniff'
   };
 }
@@ -20,7 +20,11 @@ function json(body, status = 200, maxAge = 0) {
   h.set('Cache-Control', maxAge > 0 ? `public, max-age=${maxAge}` : 'no-store');
   return new Response(JSON.stringify(body), { status, headers: h });
 }
-function finite(v) { const n = Number(v); return Number.isFinite(n) ? n : null; }
+function finite(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
 function firstFinite(...vals) { for (const v of vals) { const n = finite(v); if (n !== null) return n; } return null; }
 function stationId(env) { return env.STATION_ID || DEFAULT_STATION_ID; }
 function stationBase(env) { return String(env.STATION_API_BASE || DEFAULT_STATION_API_BASE).replace(/\/$/, ''); }
@@ -155,44 +159,117 @@ async function apiYear(env,yearParam){
 }
 
 function validSymbol(s){ return /^[A-Z0-9.^=\-]{1,24}$/i.test(s); }
+function positiveFinite(v){ const n=finite(v); return n!==null&&n>0?n:null; }
+function sameMarketDay(a,b,offset=0){
+  return Number.isFinite(a)&&Number.isFinite(b)&&Math.floor((a+offset)/86400)===Math.floor((b+offset)/86400);
+}
+function splitFactorBetween(events, startTs, endTs){
+  const splits=events?.splits&&typeof events.splits==='object'?Object.values(events.splits):[];
+  let factor=1, found=false;
+  for(const e of splits){
+    const ts=Number(e?.date||e?.timestamp); if(!Number.isFinite(ts)||ts<=startTs||ts>endTs+86400) continue;
+    const numerator=positiveFinite(e?.numerator); const denominator=positiveFinite(e?.denominator);
+    if(numerator&&denominator){ factor*=denominator/numerator; found=true; continue; }
+    const ratio=String(e?.splitRatio||'').match(/([\d.]+)\s*:\s*([\d.]+)/);
+    if(ratio){ const a=positiveFinite(ratio[1]), b=positiveFinite(ratio[2]); if(a&&b){ factor*=b/a; found=true; } }
+  }
+  return found?factor:null;
+}
 async function yahooOne(symbol){
   const bases=['https://query1.finance.yahoo.com','https://query2.finance.yahoo.com'];
   let lastErr=null;
   for(const base of bases){
     try{
-      const url=`${base}/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d&includePrePost=false`;
+      const url=`${base}/v8/finance/chart/${encodeURIComponent(symbol)}?range=10d&interval=1d&includePrePost=false&events=div%2Csplits%2CcapitalGains`;
       const d=await fetchJson(url,{headers:{'User-Agent':'Mozilla/5.0','Accept':'application/json'}});
       const r=d?.chart?.result?.[0]; const m=r?.meta||{};
-      const price=finite(m.regularMarketPrice);
-      if(price===null) throw new Error('No price');
-
-      // لا نعتمد على meta.previousClose وحده؛ قد يعيد Yahoo قيمة أقدم لبعض رموز تداول.
-      // نستخرج إغلاق جلسة التداول السابقة من السلسلة اليومية نفسها.
       const ts=Array.isArray(r?.timestamp)?r.timestamp:[];
-      const closes=Array.isArray(r?.indicators?.quote?.[0]?.close)?r.indicators.quote[0].close:[];
-      const daily=ts.map((t,i)=>({ts:Number(t),close:finite(closes[i])})).filter(x=>Number.isFinite(x.ts)&&x.close!==null);
-      let prev=firstFinite(m.previousClose,m.chartPreviousClose);
-      if(daily.length){
-        const last=daily[daily.length-1], prior=daily[daily.length-2];
-        const marketTs=Number(m.regularMarketTime);
-        const offset=Number(m.gmtoffset)||0;
-        const marketDay=Number.isFinite(marketTs)?Math.floor((marketTs+offset)/86400):null;
-        const lastDay=Math.floor((last.ts+offset)/86400);
-        if(prior && marketDay!==null && lastDay===marketDay) prev=prior.close;
-        else prev=last.close;
+      const quote=r?.indicators?.quote?.[0]||{};
+      const opens=Array.isArray(quote.open)?quote.open:[], highs=Array.isArray(quote.high)?quote.high:[], lows=Array.isArray(quote.low)?quote.low:[];
+      const closes=Array.isArray(quote.close)?quote.close:[], volumes=Array.isArray(quote.volume)?quote.volume:[];
+      const daily=ts.map((t,i)=>({
+        ts:Number(t), open:positiveFinite(opens[i]), high:positiveFinite(highs[i]), low:positiveFinite(lows[i]),
+        close:positiveFinite(closes[i]), volume:finite(volumes[i])
+      })).filter(x=>Number.isFinite(x.ts)&&x.close!==null).sort((a,b)=>a.ts-b.ts);
+      if(!daily.length) throw new Error('No daily price');
+
+      const last=daily[daily.length-1], prior=daily[daily.length-2]||null;
+      const metaPrice=positiveFinite(m.regularMarketPrice);
+      // قيم الصفر في ما قبل الافتتاح ليست سعرًا حقيقيًا. نرجع دائمًا لآخر إغلاق صالح بدل تفسير الصفر كهبوط.
+      const price=metaPrice ?? last.close;
+      if(price===null) throw new Error('No price');
+      const marketTs=Number(m.regularMarketTime);
+      const effectiveTs=Number.isFinite(marketTs)?marketTs:last.ts;
+      const offset=Number(m.gmtoffset)||0;
+
+      let prev=prior?.close ?? firstFinite(m.previousClose,m.chartPreviousClose);
+      let corporateAction=false;
+      if(prior){
+        const factor=splitFactorBetween(r?.events,prior.ts,last.ts);
+        if(factor!==null&&Math.abs(factor-1)>0.000001){ prev=prior.close*factor; corporateAction=true; }
       }
-      const change=prev===null?null:price-prev; const pct=prev&&change!==null?(change/prev)*100:null;
-      return {symbol,price,previousClose:prev,change,changePercent:pct,currency:m.currency||null,marketTime:m.regularMarketTime?new Date(m.regularMarketTime*1000).toISOString():null,delayed:true};
+      if(prev!==null&&prev<=0) prev=null;
+      const change=prev===null?null:price-prev;
+      const pct=prev&&change!==null?(change/prev)*100:null;
+
+      // OHLC لآخر جلسة فعلية. إذا أعاد Yahoo أصفارًا في الافتتاح/النطاق نخفيها بدل عرضها كبيانات صحيحة.
+      const session=sameMarketDay(last.ts,effectiveTs,offset)?last:last;
+      return {
+        symbol,price,previousClose:prev,change,changePercent:pct,currency:m.currency||null,
+        open:session?.open??null,high:session?.high??null,low:session?.low??null,volume:session?.volume??null,
+        corporateAction,marketTime:new Date(effectiveTs*1000).toISOString(),delayed:true
+      };
     }catch(e){lastErr=e;}
   }
-  return {symbol,error:lastErr?.message||'unavailable',price:null,previousClose:null,change:null,changePercent:null,currency:null,delayed:true};
+  return {symbol,error:lastErr?.message||'unavailable',price:null,previousClose:null,change:null,changePercent:null,currency:null,open:null,high:null,low:null,volume:null,corporateAction:false,delayed:true};
 }
 async function apiMarkets(url){
   const raw=String(url.searchParams.get('symbols')||'').split(',').map(s=>s.trim()).filter(Boolean);
-  const symbols=[...new Set(raw.filter(validSymbol))].slice(0,30);
+  const symbols=[...new Set(raw.filter(validSymbol))].slice(0,40);
   if(!symbols.length) return json({error:'لم تُرسل رموز أسعار.'},400);
   const items=await Promise.all(symbols.map(yahooOne));
   return json({updatedAt:new Date().toISOString(),source:'Yahoo Finance (public chart endpoint)',items},200,60);
+}
+function normalizeMarketItems(items){
+  if(!Array.isArray(items)) return null;
+  const allowed=new Set(['index','commodity','stock']); const seen=new Set(); const out=[];
+  for(const x of items){
+    const symbol=String(x?.symbol||'').trim().toUpperCase(); const name=String(x?.name||'').trim(); const category=String(x?.category||'').trim();
+    if(!validSymbol(symbol)||!name||name.length>80||!allowed.has(category)||seen.has(symbol)) continue;
+    seen.add(symbol); out.push({symbol,name,category,enabled:x?.enabled!==false});
+  }
+  return out.length?out:null;
+}
+function marketsConfigSource(items){
+  const intro='// القائمة الأساسية للأسعار.\n// الأسهم يمكن إضافتها أو تعطيلها من شاشة «الأسعار»؛ العامل يحدّث هذا الملف في GitHub عند تفعيل إدارة القائمة.\nwindow.TAQSS_MARKETS = [\n';
+  const order=['index','commodity','stock']; const lines=[];
+  for(const category of order){
+    const group=items.filter(x=>x.category===category);
+    for(const x of group) lines.push(`  { symbol: ${JSON.stringify(x.symbol)}, name: ${JSON.stringify(x.name)}, category: ${JSON.stringify(x.category)}, enabled: ${x.enabled!==false} },`);
+    if(group.length) lines.push('');
+  }
+  if(lines[lines.length-1]==='') lines.pop();
+  return `${intro}${lines.join('\n')}\n];\n`;
+}
+function utf8Base64(value){
+  const bytes=new TextEncoder().encode(value); let binary=''; const size=0x8000;
+  for(let i=0;i<bytes.length;i+=size) binary+=String.fromCharCode(...bytes.subarray(i,i+size));
+  return btoa(binary);
+}
+async function apiUpdateMarketsConfig(request,env){
+  if(!env.GITHUB_TOKEN||!env.MARKETS_ADMIN_KEY) return json({error:'إدارة قائمة الأسهم غير مفعلة في العامل.'},503);
+  const supplied=String(request.headers.get('X-Admin-Key')||'');
+  if(!supplied||supplied!==String(env.MARKETS_ADMIN_KEY)) return json({error:'رمز الإدارة غير صحيح.'},401);
+  let body=null; try{body=await request.json();}catch{return json({error:'بيانات الطلب غير صالحة.'},400);}
+  const items=normalizeMarketItems(body?.items); if(!items) return json({error:'قائمة الأسعار غير صالحة.'},400);
+  const owner=env.GITHUB_OWNER||'muala-code'; const repo=env.GITHUB_REPO||'taqss-dashboard'; const branch=env.GITHUB_BRANCH||'main'; const path=env.GITHUB_MARKETS_PATH||'markets-config.js';
+  const api=`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(branch)}`;
+  const headers={'Authorization':`Bearer ${env.GITHUB_TOKEN}`,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'taqss-dashboard-worker'};
+  const current=await fetchJson(api,{headers}); const sha=current?.sha; if(!sha) return json({error:'تعذر قراءة ملف قائمة الأسعار من GitHub.'},502);
+  const putUrl=api.replace(/\?ref=.*$/,'');
+  const payload={message:'Update market items from Taqss Dashboard',content:utf8Base64(marketsConfigSource(items)),sha,branch};
+  const updated=await fetchJson(putUrl,{method:'PUT',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  return json({ok:true,items,commit:updated?.commit?.sha||null},200,0);
 }
 
 async function cached(request,ctx,ttl,producer){
@@ -204,8 +281,11 @@ async function cached(request,ctx,ttl,producer){
 export default {
   async fetch(request,env,ctx){
     if(request.method==='OPTIONS') return new Response(null,{status:204,headers:corsHeaders()});
-    if(!['GET','HEAD'].includes(request.method)) return json({error:'Method not allowed'},405);
     const url=new URL(request.url);
+    if(request.method==='POST'&&url.pathname==='/api/markets/config') {
+      try { return await apiUpdateMarketsConfig(request,env); } catch(e) { console.error(e); return json({error:'تعذر حفظ قائمة الأسهم.',detail:e?.message||String(e)},502); }
+    }
+    if(!['GET','HEAD'].includes(request.method)) return json({error:'Method not allowed'},405);
     try{
       if(url.pathname==='/api/weather') return cached(request,ctx,55,()=>apiWeather(env));
       if(url.pathname==='/api/history/today'||url.pathname==='/api/history') return cached(request,ctx,300,()=>apiToday(env));

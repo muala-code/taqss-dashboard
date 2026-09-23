@@ -1,7 +1,26 @@
 (() => {
   "use strict";
   const cfg = window.TAQSS_CONFIG || {};
-  const marketsCfg = (window.TAQSS_MARKETS || []).filter(x => x.enabled !== false);
+  const MARKET_STORAGE_KEY = "taqssMarketsOverrideV1";
+  const MARKET_ADMIN_SESSION_KEY = "taqssMarketsAdminKey";
+  function cloneMarkets(items) {
+    return (Array.isArray(items) ? items : []).map(x => ({
+      symbol: String(x?.symbol || "").trim(),
+      name: String(x?.name || "").trim(),
+      category: String(x?.category || "stock").trim(),
+      enabled: x?.enabled !== false
+    })).filter(x => x.symbol && x.name);
+  }
+  function initialMarkets() {
+    const defaults = cloneMarkets(window.TAQSS_MARKETS || []);
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(MARKET_STORAGE_KEY) || "null");
+      if (Array.isArray(saved) && saved.length) return cloneMarkets(saved);
+    } catch {}
+    return defaults;
+  }
+  let marketsCfg = initialMarkets();
+  const activeMarkets = () => marketsCfg.filter(x => x.enabled !== false);
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
   let chart = null;
@@ -21,6 +40,27 @@
     if (code === "SAR") return "ر.س";
     if (code === "USD") return "$";
     return code || "";
+  }
+  function temperatureBand(value) {
+    const n = finite(value);
+    if (n === null) return "temp-neutral";
+    if (n >= 40) return "temp-very-hot";
+    if (n >= 35) return "temp-hot";
+    if (n >= 22) return "temp-mild";
+    return "temp-cold";
+  }
+  let lastCurrentTemperature = null;
+  function styleCurrentTemperature(row, value) {
+    if (!row) return;
+    const dd = row.querySelector("dd");
+    const band = temperatureBand(value);
+    row.classList.add("current-temperature-row", band);
+    if (dd) dd.classList.add("current-temperature-value");
+    const n = finite(value);
+    if (n !== null && lastCurrentTemperature !== null && Math.abs(n - lastCurrentTemperature) >= 0.05) {
+      row.classList.add(n > lastCurrentTemperature ? "temperature-rise" : "temperature-fall");
+    }
+    lastCurrentTemperature = n;
   }
   function formatUpdateTime(value) {
     if (!value) return "";
@@ -240,7 +280,8 @@
       // ترتيب منطقي سريع القراءة على الجوال.
       const condition = weatherCondition(d) || "—";
       addRow(dl, "🌤️ حالة الطقس الآن", condition);
-      addRow(dl, "🌡️ الحرارة الحالية", `${fmt(d.temperature)} °C`);
+      const currentTempRow = addRow(dl, "🌡️ الحرارة الحالية", `${fmt(d.temperature)} °C`);
+      styleCurrentTemperature(currentTempRow, d.temperature);
       addRow(dl, "🌡️ المحسوسة", `${fmt(calculatedFeelsLike(d))} °C`);
       addRow(dl, "⬆️ العظمى اليوم", `${fmt(d.dayMax)} °C`);
       addRow(dl, "⬇️ الصغرى اليوم", `${fmt(d.dayMin)} °C`);
@@ -414,7 +455,120 @@
     }
   }
 
+  const previousMarketPrices = new Map();
   let marketsLoading = false;
+
+  function marketDirection(q) {
+    const pct = finite(q?.changePercent);
+    if (pct !== null && Math.abs(pct) >= 0.005) return pct > 0 ? "up" : "down";
+    const change = finite(q?.change);
+    if (change !== null && Math.abs(change) >= 0.005) return change > 0 ? "up" : "down";
+    return "";
+  }
+  function marketSigned(value, suffix = "", digits = 2) {
+    const n = finite(value);
+    if (n === null) return "—";
+    const clean = Math.abs(n) < 0.005 ? 0 : n;
+    return `${clean > 0 ? "+" : ""}${fmt(clean, digits)}${suffix}`;
+  }
+  function compactVolume(value) {
+    const n = finite(value);
+    if (n === null) return "—";
+    return n.toLocaleString("ar-SA-u-nu-latn", { maximumFractionDigits: 0 });
+  }
+  function marketAdminKey() {
+    let key = sessionStorage.getItem(MARKET_ADMIN_SESSION_KEY) || "";
+    if (!key) {
+      key = String(prompt("رمز إدارة قائمة الأسهم:") || "").trim();
+      if (key) sessionStorage.setItem(MARKET_ADMIN_SESSION_KEY, key);
+    }
+    return key;
+  }
+  async function persistMarketsConfig(nextItems) {
+    if (cfg.marketsConfigWriteEnabled === false) throw new Error("إدارة قائمة الأسهم غير مفعلة.");
+    const key = marketAdminKey();
+    if (!key) throw new Error("لم يُدخل رمز الإدارة.");
+    const base = dashboardBase();
+    if (!base) throw new Error("عامل الأسعار غير مفعّل.");
+    const r = await fetch(`${base}/api/markets/config`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Admin-Key": key },
+      body: JSON.stringify({ items: nextItems })
+    });
+    const text = await r.text();
+    let data = null; try { data = text ? JSON.parse(text) : null; } catch {}
+    if (r.status === 401) sessionStorage.removeItem(MARKET_ADMIN_SESSION_KEY);
+    if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+    sessionStorage.setItem(MARKET_STORAGE_KEY, JSON.stringify(nextItems));
+    return data;
+  }
+  async function addStockFromUi() {
+    const symbol = String(prompt("رمز السهم كما يستخدمه Yahoo Finance (مثال: AAPL أو 1120.SR):") || "").trim().toUpperCase();
+    if (!symbol) return;
+    if (!/^[A-Z0-9.^=\-]{1,24}$/i.test(symbol)) { alert("رمز السهم غير صالح."); return; }
+    const existing = marketsCfg.find(x => x.symbol.toUpperCase() === symbol);
+    if (existing && existing.enabled !== false) { alert("هذا العنصر ظاهر بالفعل."); return; }
+    let name = existing?.name || String(prompt("الاسم الظاهر للسهم:") || "").trim();
+    if (!name) return;
+    try {
+      const check = await getJson(`${dashboardBase()}/api/markets?symbols=${encodeURIComponent(symbol)}`);
+      const quote = check?.items?.[0];
+      if (!quote || finite(quote.price) === null) throw new Error("لم يعثر المصدر على قراءة صالحة لهذا الرمز.");
+    } catch (e) { alert(`تعذر إضافة الرمز: ${e.message}`); return; }
+    const next = cloneMarkets(marketsCfg);
+    const found = next.find(x => x.symbol.toUpperCase() === symbol);
+    if (found) { found.enabled = true; found.name = name; found.category = "stock"; }
+    else next.push({ symbol, name, category: "stock", enabled: true });
+    try {
+      await persistMarketsConfig(next);
+      marketsCfg = next;
+      await loadMarkets({ silent: true });
+    } catch (e) { alert(`تعذر حفظ السهم: ${e.message}`); }
+  }
+  async function disableStockFromUi(symbol) {
+    const next = cloneMarkets(marketsCfg);
+    const found = next.find(x => x.symbol === symbol);
+    if (!found) return;
+    found.enabled = false;
+    try {
+      await persistMarketsConfig(next);
+      marketsCfg = next;
+      await loadMarkets({ silent: true });
+    } catch (e) { alert(`تعذر تعطيل السهم: ${e.message}`); }
+  }
+  function buildMarketHeader(title, key) {
+    const head = document.createElement("div"); head.className = "market-group-heading";
+    const h = document.createElement("h3"); h.textContent = title; head.appendChild(h);
+    if (key === "stock") {
+      const add = document.createElement("button");
+      add.type = "button"; add.className = "market-add-button"; add.textContent = "+";
+      add.title = "إضافة سهم"; add.setAttribute("aria-label", "إضافة سهم");
+      add.addEventListener("click", addStockFromUi);
+      head.appendChild(add);
+    }
+    return head;
+  }
+  function buildStockDetails(q) {
+    const details = document.createElement("div"); details.className = "market-details"; details.hidden = true;
+    const fields = [
+      ["الإغلاق السابق", q.previousClose, 2], ["الافتتاح", q.open, 2],
+      ["الأعلى", q.high, 2], ["الأدنى", q.low, 2]
+    ];
+    for (const [label, value, digits] of fields) {
+      const cell = document.createElement("span"); cell.innerHTML = `<small>${label}</small><strong>${fmt(value, digits)}</strong>`; details.appendChild(cell);
+    }
+    const vol = document.createElement("span"); vol.innerHTML = `<small>حجم التداول</small><strong>${compactVolume(q.volume)}</strong>`; details.appendChild(vol);
+    if (q.corporateAction) {
+      const note = document.createElement("p"); note.className = "market-action-note"; note.textContent = "تم تعديل مرجع التغير لإجراء على السهم."; details.appendChild(note);
+    }
+    return details;
+  }
+  function addMarketFlash(row, symbol, price) {
+    const n = finite(price), prev = previousMarketPrices.get(symbol);
+    if (n !== null && prev !== undefined && Math.abs(n - prev) >= 0.0001) row.classList.add(n > prev ? "flash-up" : "flash-down");
+    if (n !== null) previousMarketPrices.set(symbol, n);
+  }
+
   async function loadMarkets({silent=false} = {}) {
     const status = $("#marketsStatus"), root = $("#marketsData");
     if (marketsLoading) return;
@@ -423,23 +577,42 @@
     marketsLoading = true;
     if (!silent && !root.children.length) status.textContent = "جارٍ جلب الأسعار…";
     try {
-      const symbols = marketsCfg.map(x => x.symbol).join(",");
+      const visible = activeMarkets();
+      const symbols = visible.map(x => x.symbol).join(",");
       const d = await getJson(`${base}/api/markets?symbols=${encodeURIComponent(symbols)}`);
       const bySymbol = new Map((d.items || []).map(x => [x.symbol, x]));
       const frag = document.createDocumentFragment();
       const groups = [["index","المؤشرات"],["commodity","المعادن والطاقة"],["stock","الأسهم"]];
       for (const [key,title] of groups) {
         const section = document.createElement("section"); section.className="market-group";
-        const h = document.createElement("h3"); h.textContent=title; section.appendChild(h);
-        for (const item of marketsCfg.filter(x=>x.category===key)) {
+        section.appendChild(buildMarketHeader(title, key));
+        for (const item of visible.filter(x=>x.category===key)) {
           const q = bySymbol.get(item.symbol) || {};
-          const row = document.createElement("div"); row.className="market-row";
-          const rawChange = finite(q.change), rawPct = finite(q.changePercent);
-          const change = rawChange !== null && Math.abs(rawChange) < 0.005 ? 0 : rawChange;
-          const pct = rawPct !== null && Math.abs(rawPct) < 0.005 ? 0 : rawPct;
-          const cls = change > 0 ? "up" : change < 0 ? "down" : "";
-          row.innerHTML = `<span>${item.name}</span><span class="num">${fmt(q.price, 2)} ${marketCurrency(q.currency)}</span><span class="num ${cls}">${change === null ? "—" : `${change > 0 ? "+" : ""}${fmt(change,2)}`}</span><span class="num ${cls}">${pct === null ? "—" : `${pct > 0 ? "+" : ""}${fmt(pct,2)}%`}</span>`;
-          section.appendChild(row);
+          const cls = marketDirection(q);
+          const pct = finite(q.changePercent);
+          const change = finite(q.change);
+          const itemWrap = document.createElement("div"); itemWrap.className = "market-item";
+          const row = document.createElement("div"); row.className = `market-row ${key === "index" ? "index-row" : ""}`.trim();
+          if (key === "index") {
+            row.innerHTML = `<span class="market-name">${item.name}</span><span class="num market-index-value ${cls}">${fmt(q.price,2)}</span><span class="num ${cls}">${pct === null ? "—" : marketSigned(pct,"%")}</span>`;
+          } else {
+            row.innerHTML = `<span class="market-name">${item.name}</span><span class="num ${cls}">${fmt(q.price,2)} ${marketCurrency(q.currency)}</span><span class="num ${cls}">${change === null ? "—" : marketSigned(change)}</span><span class="num ${cls}">${pct === null ? "—" : marketSigned(pct,"%")}</span>`;
+            if (key === "stock") {
+              row.classList.add("stock-row"); row.tabIndex = 0; row.setAttribute("role", "button"); row.setAttribute("aria-expanded", "false");
+              const remove = document.createElement("button"); remove.type = "button"; remove.className = "market-remove-button"; remove.textContent = "−"; remove.title = "تعطيل ظهور السهم"; remove.setAttribute("aria-label", `تعطيل ${item.name}`);
+              remove.addEventListener("click", e => { e.stopPropagation(); disableStockFromUi(item.symbol); });
+              row.appendChild(remove);
+              const details = buildStockDetails(q); itemWrap.append(row, details);
+              const toggle = () => { details.hidden = !details.hidden; row.setAttribute("aria-expanded", details.hidden ? "false" : "true"); };
+              row.addEventListener("click", e => { if (!e.target.closest("button")) toggle(); });
+              row.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && !e.target.closest("button")) { e.preventDefault(); toggle(); } });
+              addMarketFlash(row, item.symbol, q.price);
+              section.appendChild(itemWrap);
+              continue;
+            }
+          }
+          addMarketFlash(row, item.symbol, q.price);
+          itemWrap.appendChild(row); section.appendChild(itemWrap);
         }
         frag.appendChild(section);
       }

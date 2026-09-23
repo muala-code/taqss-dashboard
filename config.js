@@ -11,5 +11,8 @@ window.TAQSS_CONFIG = {
   latitude: 24.234096,
   longitude: 39.551125,
   timeZone: "Asia/Riyadh",
-  marketsRefreshMs: 60000
+  marketsRefreshMs: 60000,
+
+  // إعدادات إدارة قائمة الأسهم. المفتاح الإداري نفسه يبقى Secret داخل العامل.
+  marketsConfigWriteEnabled: true
 };
