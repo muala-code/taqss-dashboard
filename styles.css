@@ -55,7 +55,27 @@ main { width: min(100%, 760px); margin-inline: auto; padding: 1rem; }
 }
 dt { min-width: 0; }
 dd { margin: 0; text-align: left; direction: ltr; }
-select { width: 100%; margin: .6rem 0 .65rem; padding: .55rem; font: inherit; }
+/* Custom chart picker: same interaction on mobile and desktop, without the native phone selector. */
+.chart-picker { position: relative; margin: .6rem 0 .65rem; }
+.chart-picker-button {
+  width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  padding: .55rem .7rem; border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  background: Canvas; color: inherit; font: inherit; text-align: right; cursor: pointer;
+}
+.chart-picker-chevron { opacity: .62; font-size: 1.05rem; }
+.chart-picker-menu {
+  position: absolute; z-index: 900; inset-inline: 0; top: calc(100% + .25rem);
+  border: 1px solid color-mix(in srgb, currentColor 28%, transparent); background: Canvas;
+  box-shadow: 0 7px 20px color-mix(in srgb, currentColor 12%, transparent);
+}
+.chart-picker-menu[hidden] { display: none; }
+.chart-picker-menu button {
+  display: block; width: 100%; min-height: 44px; padding: .6rem .7rem; border: 0;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  background: transparent; color: inherit; font: inherit; text-align: right; cursor: pointer;
+}
+.chart-picker-menu button:last-child { border-bottom: 0; }
+.chart-picker-menu button[aria-selected="true"] { font-weight: 700; background: color-mix(in srgb, currentColor 6%, Canvas); }
 .period-nav {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -167,10 +187,22 @@ body.radar-pseudo-fullscreen { overflow: hidden; }
 .prayer-rows { margin-top: .25rem; }
 .prayer-rows > div { position: relative; }
 .prayer-rows > div.next-prayer {
+  grid-template-columns: minmax(0, 1fr) minmax(3rem, 18%) auto;
+  align-items: center;
   padding-inline: .45rem;
   border-radius: .35rem;
-  background: color-mix(in srgb, #d8b24a 14%, Canvas);
-  border-bottom-color: color-mix(in srgb, #d8b24a 28%, transparent);
+  background: color-mix(in srgb, #d8b24a 10%, Canvas);
+  border-bottom-color: color-mix(in srgb, #d8b24a 26%, transparent);
+}
+.prayer-countdown {
+  display: block; height: 4px; overflow: hidden; border-radius: 999px;
+  background: color-mix(in srgb, currentColor 13%, transparent);
+  direction: ltr;
+}
+.prayer-countdown-fill {
+  display: block; height: 100%; border-radius: inherit;
+  background: color-mix(in srgb, #15803d 78%, currentColor 22%);
+  transition: width .45s linear;
 }
 .moon-section {
   padding-top: .7rem;
@@ -227,17 +259,10 @@ body.radar-pseudo-fullscreen { overflow: hidden; }
 /* v0.18 — markets */
 .market-group-heading { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin: 0 0 .3rem; }
 .market-group-heading h3 { margin: 0; }
-.market-add-button, .market-remove-button {
-  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-  background: color-mix(in srgb, Canvas 92%, currentColor 8%);
-  color: inherit; border-radius: 999px; line-height: 1; cursor: pointer;
-}
-.market-add-button { width: 2rem; height: 2rem; font-size: 1.3rem; font-weight: 700; }
-.market-remove-button { width: 1.7rem; height: 1.7rem; font-size: 1.1rem; padding: 0; }
 .market-item { border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent); }
 .market-item .market-row { border-bottom: 0; }
 .market-row.index-row { grid-template-columns: minmax(5.5rem, 1fr) auto auto; }
-.market-row.stock-row { grid-template-columns: minmax(5.5rem, 1fr) auto auto auto auto; cursor: pointer; }
+.market-row.stock-row { grid-template-columns: minmax(5.5rem, 1fr) auto auto auto; cursor: pointer; }
 .market-row.stock-row:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .market-index-value { font-weight: 800; }
 .market-details {
@@ -245,17 +270,24 @@ body.radar-pseudo-fullscreen { overflow: hidden; }
   padding: .15rem .15rem .7rem; font-size: .78rem;
 }
 .market-details[hidden] { display: none; }
-.market-details span { display: flex; justify-content: space-between; gap: .5rem; }
-.market-details small { opacity: .65; }
-.market-details strong { direction: ltr; font-weight: 600; }
+.market-details span { display: inline-flex; justify-content: flex-start; align-items: baseline; gap: .22rem; min-width: 0; }
+.market-details small { opacity: .68; white-space: nowrap; }
+.market-details strong { direction: ltr; font-weight: 650; white-space: nowrap; }
 .market-action-note { grid-column: 1 / -1; margin: .15rem 0 0; opacity: .68; }
 .market-row.flash-up { animation: market-flash-up .72s ease-out; }
 .market-row.flash-down { animation: market-flash-down .72s ease-out; }
 @keyframes market-flash-up { 0% { background: color-mix(in srgb, #16a34a 22%, transparent); } 100% { background: transparent; } }
 @keyframes market-flash-down { 0% { background: color-mix(in srgb, #dc2626 20%, transparent); } 100% { background: transparent; } }
 @media (max-width: 470px) {
+  /* Slightly stronger primary text only; secondary/status text keeps its current scale. */
+  .simple-section h2, .market-group h3 { font-size: 1.08rem; }
+  .rows > div > dt, .rows > div > dd { font-size: 1rem; font-weight: 600; }
   .market-row { gap: .38rem; }
-  .market-row.stock-row { grid-template-columns: minmax(4.4rem, 1fr) auto auto auto 1.7rem; }
-  .market-row .num { font-size: .82rem; }
-  .market-row > span:first-child { font-size: .9rem; }
+  .market-row.stock-row { grid-template-columns: minmax(4.4rem, 1fr) auto auto auto; }
+  .market-row .num { font-size: .88rem; font-weight: 600; }
+  .market-row > span:first-child { font-size: .95rem; font-weight: 600; }
+  .market-details { font-size: .78rem; }
+  .market-details small { font-size: .76rem; font-weight: 400; }
+  .market-details strong { font-size: .78rem; }
+  .prayer-rows > div.next-prayer { grid-template-columns: minmax(0, 1fr) minmax(2.6rem, 17%) auto; gap: .55rem; }
 }

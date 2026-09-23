@@ -1,8 +1,6 @@
 (() => {
   "use strict";
   const cfg = window.TAQSS_CONFIG || {};
-  const MARKET_STORAGE_KEY = "taqssMarketsOverrideV1";
-  const MARKET_ADMIN_SESSION_KEY = "taqssMarketsAdminKey";
   function cloneMarkets(items) {
     return (Array.isArray(items) ? items : []).map(x => ({
       symbol: String(x?.symbol || "").trim(),
@@ -12,12 +10,7 @@
     })).filter(x => x.symbol && x.name);
   }
   function initialMarkets() {
-    const defaults = cloneMarkets(window.TAQSS_MARKETS || []);
-    try {
-      const saved = JSON.parse(sessionStorage.getItem(MARKET_STORAGE_KEY) || "null");
-      if (Array.isArray(saved) && saved.length) return cloneMarkets(saved);
-    } catch {}
-    return defaults;
+    return cloneMarkets(window.TAQSS_MARKETS || []);
   }
   let marketsCfg = initialMarkets();
   const activeMarkets = () => marketsCfg.filter(x => x.enabled !== false);
@@ -26,6 +19,7 @@
   let chart = null;
   const loaded = new Set();
   const chartState = { monthYear: null, month: null, year: null };
+  let selectedChartKind = "today-temp";
   const monthNames = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
 
   const stationBase = () => String(cfg.stationApiBase || "").replace(/\/$/, "");
@@ -199,7 +193,7 @@
     }
   }
   function moveChartPeriod(delta) {
-    const kind = $("#chartSelect").value;
+    const kind = selectedChartKind;
     const type = periodType(kind);
     ensureChartState();
     if (type === "month") {
@@ -457,6 +451,7 @@
 
   const previousMarketPrices = new Map();
   let marketsLoading = false;
+  let openStockSymbol = null;
 
   function marketDirection(q) {
     const pct = finite(q?.changePercent);
@@ -476,76 +471,9 @@
     if (n === null) return "—";
     return n.toLocaleString("ar-SA-u-nu-latn", { maximumFractionDigits: 0 });
   }
-  function marketAdminKey() {
-    let key = sessionStorage.getItem(MARKET_ADMIN_SESSION_KEY) || "";
-    if (!key) {
-      key = String(prompt("رمز إدارة قائمة الأسهم:") || "").trim();
-      if (key) sessionStorage.setItem(MARKET_ADMIN_SESSION_KEY, key);
-    }
-    return key;
-  }
-  async function persistMarketsConfig(nextItems) {
-    if (cfg.marketsConfigWriteEnabled === false) throw new Error("إدارة قائمة الأسهم غير مفعلة.");
-    const key = marketAdminKey();
-    if (!key) throw new Error("لم يُدخل رمز الإدارة.");
-    const base = dashboardBase();
-    if (!base) throw new Error("عامل الأسعار غير مفعّل.");
-    const r = await fetch(`${base}/api/markets/config`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Admin-Key": key },
-      body: JSON.stringify({ items: nextItems })
-    });
-    const text = await r.text();
-    let data = null; try { data = text ? JSON.parse(text) : null; } catch {}
-    if (r.status === 401) sessionStorage.removeItem(MARKET_ADMIN_SESSION_KEY);
-    if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
-    sessionStorage.setItem(MARKET_STORAGE_KEY, JSON.stringify(nextItems));
-    return data;
-  }
-  async function addStockFromUi() {
-    const symbol = String(prompt("رمز السهم كما يستخدمه Yahoo Finance (مثال: AAPL أو 1120.SR):") || "").trim().toUpperCase();
-    if (!symbol) return;
-    if (!/^[A-Z0-9.^=\-]{1,24}$/i.test(symbol)) { alert("رمز السهم غير صالح."); return; }
-    const existing = marketsCfg.find(x => x.symbol.toUpperCase() === symbol);
-    if (existing && existing.enabled !== false) { alert("هذا العنصر ظاهر بالفعل."); return; }
-    let name = existing?.name || String(prompt("الاسم الظاهر للسهم:") || "").trim();
-    if (!name) return;
-    try {
-      const check = await getJson(`${dashboardBase()}/api/markets?symbols=${encodeURIComponent(symbol)}`);
-      const quote = check?.items?.[0];
-      if (!quote || finite(quote.price) === null) throw new Error("لم يعثر المصدر على قراءة صالحة لهذا الرمز.");
-    } catch (e) { alert(`تعذر إضافة الرمز: ${e.message}`); return; }
-    const next = cloneMarkets(marketsCfg);
-    const found = next.find(x => x.symbol.toUpperCase() === symbol);
-    if (found) { found.enabled = true; found.name = name; found.category = "stock"; }
-    else next.push({ symbol, name, category: "stock", enabled: true });
-    try {
-      await persistMarketsConfig(next);
-      marketsCfg = next;
-      await loadMarkets({ silent: true });
-    } catch (e) { alert(`تعذر حفظ السهم: ${e.message}`); }
-  }
-  async function disableStockFromUi(symbol) {
-    const next = cloneMarkets(marketsCfg);
-    const found = next.find(x => x.symbol === symbol);
-    if (!found) return;
-    found.enabled = false;
-    try {
-      await persistMarketsConfig(next);
-      marketsCfg = next;
-      await loadMarkets({ silent: true });
-    } catch (e) { alert(`تعذر تعطيل السهم: ${e.message}`); }
-  }
-  function buildMarketHeader(title, key) {
+  function buildMarketHeader(title) {
     const head = document.createElement("div"); head.className = "market-group-heading";
     const h = document.createElement("h3"); h.textContent = title; head.appendChild(h);
-    if (key === "stock") {
-      const add = document.createElement("button");
-      add.type = "button"; add.className = "market-add-button"; add.textContent = "+";
-      add.title = "إضافة سهم"; add.setAttribute("aria-label", "إضافة سهم");
-      add.addEventListener("click", addStockFromUi);
-      head.appendChild(add);
-    }
     return head;
   }
   function buildStockDetails(q) {
@@ -555,9 +483,9 @@
       ["الأعلى", q.high, 2], ["الأدنى", q.low, 2]
     ];
     for (const [label, value, digits] of fields) {
-      const cell = document.createElement("span"); cell.innerHTML = `<small>${label}</small><strong>${fmt(value, digits)}</strong>`; details.appendChild(cell);
+      const cell = document.createElement("span"); cell.innerHTML = `<small>${label}:</small><strong>${fmt(value, digits)}</strong>`; details.appendChild(cell);
     }
-    const vol = document.createElement("span"); vol.innerHTML = `<small>حجم التداول</small><strong>${compactVolume(q.volume)}</strong>`; details.appendChild(vol);
+    const vol = document.createElement("span"); vol.innerHTML = `<small>حجم التداول:</small><strong>${compactVolume(q.volume)}</strong>`; details.appendChild(vol);
     if (q.corporateAction) {
       const note = document.createElement("p"); note.className = "market-action-note"; note.textContent = "تم تعديل مرجع التغير لإجراء على السهم."; details.appendChild(note);
     }
@@ -585,7 +513,7 @@
       const groups = [["index","المؤشرات"],["commodity","المعادن والطاقة"],["stock","الأسهم"]];
       for (const [key,title] of groups) {
         const section = document.createElement("section"); section.className="market-group";
-        section.appendChild(buildMarketHeader(title, key));
+        section.appendChild(buildMarketHeader(title));
         for (const item of visible.filter(x=>x.category===key)) {
           const q = bySymbol.get(item.symbol) || {};
           const cls = marketDirection(q);
@@ -598,14 +526,26 @@
           } else {
             row.innerHTML = `<span class="market-name">${item.name}</span><span class="num ${cls}">${fmt(q.price,2)} ${marketCurrency(q.currency)}</span><span class="num ${cls}">${change === null ? "—" : marketSigned(change)}</span><span class="num ${cls}">${pct === null ? "—" : marketSigned(pct,"%")}</span>`;
             if (key === "stock") {
-              row.classList.add("stock-row"); row.tabIndex = 0; row.setAttribute("role", "button"); row.setAttribute("aria-expanded", "false");
-              const remove = document.createElement("button"); remove.type = "button"; remove.className = "market-remove-button"; remove.textContent = "−"; remove.title = "تعطيل ظهور السهم"; remove.setAttribute("aria-label", `تعطيل ${item.name}`);
-              remove.addEventListener("click", e => { e.stopPropagation(); disableStockFromUi(item.symbol); });
-              row.appendChild(remove);
-              const details = buildStockDetails(q); itemWrap.append(row, details);
-              const toggle = () => { details.hidden = !details.hidden; row.setAttribute("aria-expanded", details.hidden ? "false" : "true"); };
-              row.addEventListener("click", e => { if (!e.target.closest("button")) toggle(); });
-              row.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && !e.target.closest("button")) { e.preventDefault(); toggle(); } });
+              row.classList.add("stock-row"); row.tabIndex = 0; row.setAttribute("role", "button");
+              const details = buildStockDetails(q);
+              const isOpen = openStockSymbol === item.symbol;
+              details.hidden = !isOpen;
+              row.setAttribute("aria-expanded", isOpen ? "true" : "false");
+              itemWrap.append(row, details);
+              const toggle = () => {
+                const willOpen = details.hidden;
+                root.querySelectorAll(".market-details").forEach(el => { el.hidden = true; });
+                root.querySelectorAll(".stock-row[aria-expanded=\"true\"]").forEach(el => el.setAttribute("aria-expanded", "false"));
+                if (willOpen) {
+                  details.hidden = false;
+                  row.setAttribute("aria-expanded", "true");
+                  openStockSymbol = item.symbol;
+                } else {
+                  openStockSymbol = null;
+                }
+              };
+              row.addEventListener("click", toggle);
+              row.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
               addMarketFlash(row, item.symbol, q.price);
               section.appendChild(itemWrap);
               continue;
@@ -722,6 +662,69 @@
     return "fajr";
   }
 
+  let prayerCountdownTimer = null;
+  let prayerCountdownTimes = null;
+
+  function prayerCountdownState(times, now = new Date()) {
+    const keys = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
+    const current = currentRiyadhMinutes(now);
+    const nextKey = nextPrayerKey(times, now);
+    const nextIndex = keys.indexOf(nextKey);
+    if (nextIndex < 0) return null;
+    let target = timeToMinutes(times?.[nextKey]);
+    if (target === null) return null;
+    let previous;
+    if (nextIndex === 0) {
+      previous = timeToMinutes(times?.isha);
+      if (previous === null) return null;
+      if (current >= previous) target += 1440;
+      else previous -= 1440;
+    } else {
+      previous = timeToMinutes(times?.[keys[nextIndex - 1]]);
+      if (previous === null) return null;
+    }
+    const span = Math.max(1, target - previous);
+    const remaining = Math.max(0, target - current);
+    const ratio = Math.max(0, Math.min(1, remaining / span));
+    return { nextKey, ratio, remaining };
+  }
+
+  function updatePrayerCountdown() {
+    if (!prayerCountdownTimes) return;
+    const state = prayerCountdownState(prayerCountdownTimes, new Date());
+    if (!state) return;
+    const names={fajr:"الفجر",dhuhr:"الظهر",asr:"العصر",maghrib:"المغرب",isha:"العشاء"};
+    $("#prayerData")?.querySelectorAll("[data-prayer-key]").forEach(row => {
+      row.classList.remove("next-prayer");
+      row.removeAttribute("aria-label");
+    });
+    $("#prayerData")?.querySelectorAll(".prayer-countdown").forEach(el => el.remove());
+    const row = $(`#prayerData [data-prayer-key="${state.nextKey}"]`);
+    if (!row) return;
+    row.classList.add("next-prayer");
+    const meter = document.createElement("span");
+    meter.className = "prayer-countdown";
+    meter.setAttribute("role", "progressbar");
+    meter.setAttribute("aria-valuemin", "0");
+    meter.setAttribute("aria-valuemax", "100");
+    meter.setAttribute("aria-valuenow", String(Math.round(state.ratio * 100)));
+    meter.setAttribute("aria-label", `الوقت المتبقي حتى ${names[state.nextKey]}`);
+    const fill = document.createElement("span");
+    fill.className = "prayer-countdown-fill";
+    fill.style.width = `${(state.ratio * 100).toFixed(1)}%`;
+    meter.appendChild(fill);
+    const dd = row.querySelector("dd");
+    row.insertBefore(meter, dd || null);
+    row.setAttribute("aria-label", `${names[state.nextKey]}، الصلاة القادمة`);
+  }
+
+  function startPrayerCountdown(times) {
+    prayerCountdownTimes = times || null;
+    if (prayerCountdownTimer) clearInterval(prayerCountdownTimer);
+    updatePrayerCountdown();
+    prayerCountdownTimer = setInterval(updatePrayerCountdown, 30000);
+  }
+
   async function loadPrayer() {
     const status = $("#prayerStatus");
     const dl = $("#prayerData");
@@ -743,14 +746,11 @@
       const hijri = cleanHijriParts(d.hijriDate);
       dateSummary.textContent = `${riyadhWeekday(now)} ${hijri} · الموافق ${gregorianHyphenArabic(now)}`;
       const names={fajr:"الفجر",sunrise:"الشروق",dhuhr:"الظهر",asr:"العصر",maghrib:"المغرب",isha:"العشاء"};
-      const nextKey = nextPrayerKey(d.times, now);
       for (const key of ["fajr","sunrise","dhuhr","asr","maghrib","isha"]) {
         const row = addRow(dl, names[key], d.times?.[key] || "—");
-        if (key === nextKey) {
-          row.classList.add("next-prayer");
-          row.setAttribute("aria-label", `${names[key]}، الصلاة القادمة`);
-        }
+        row.dataset.prayerKey = key;
       }
+      startPrayerCountdown(d.times);
 
       const moonPhase = d.moon?.phase || approximateMoonPhase(now);
       moonPhaseEl.textContent = moonPhaseIcon(moonPhase);
@@ -761,6 +761,9 @@
 
       status.textContent = "";
     } catch(e){
+      prayerCountdownTimes = null;
+      if (prayerCountdownTimer) clearInterval(prayerCountdownTimer);
+      prayerCountdownTimer = null;
       status.textContent=`تعذر جلب أوقات الصلاة: ${e.message}`;
       moonPhaseEl.textContent = "🌙";
       addRow(moonDl, "شكل القمر", "—");
@@ -783,6 +786,45 @@
     document.addEventListener("click", close);
     document.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
   }
+  function closeChartPicker() {
+    const menu = $("#chartPickerMenu");
+    const button = $("#chartPickerButton");
+    if (!menu || !button) return;
+    menu.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+  }
+
+  function selectChart(kind, label) {
+    const now = riyadhNowParts();
+    selectedChartKind = kind;
+    if (kind === "month-temp-dew") { chartState.monthYear = now.year; chartState.month = now.month; }
+    if (kind === "year-temp-rain") chartState.year = now.year;
+    const text = $("#chartPickerText");
+    if (text) text.textContent = label;
+    $("#chartPickerMenu")?.querySelectorAll("[data-chart]").forEach(option => {
+      option.setAttribute("aria-selected", option.dataset.chart === kind ? "true" : "false");
+    });
+    closeChartPicker();
+    loadChart(kind);
+  }
+
+  function setupChartPicker() {
+    const picker = $("#chartPicker");
+    const button = $("#chartPickerButton");
+    const menu = $("#chartPickerMenu");
+    if (!picker || !button || !menu) return;
+    button.addEventListener("click", () => {
+      const opening = menu.hidden;
+      menu.hidden = !opening;
+      button.setAttribute("aria-expanded", opening ? "true" : "false");
+    });
+    menu.querySelectorAll("[data-chart]").forEach(option => option.addEventListener("click", () => {
+      selectChart(option.dataset.chart, option.textContent.trim());
+    }));
+    document.addEventListener("click", e => { if (!picker.contains(e.target)) closeChartPicker(); });
+    picker.addEventListener("keydown", e => { if (e.key === "Escape") { closeChartPicker(); button.focus(); } });
+  }
+
   function setupPrayerInfo() { setupInfoToggle("#prayerInfoButton", "#prayerInfoBubble"); }
   function setupWeatherInfo() { setupInfoToggle("#weatherInfoButton", "#weatherInfoBubble"); }
 
@@ -795,7 +837,7 @@
     if (!loaded.has(name)) {
       loaded.add(name);
       if (name==="weather") loadWeather();
-      if (name==="history") loadChart($("#chartSelect").value);
+      if (name==="history") loadChart(selectedChartKind);
       if (name==="markets") loadMarkets();
       if (name==="prayer") loadPrayer();
       if (name==="radar") document.dispatchEvent(new CustomEvent("taqss:radar-open"));
@@ -808,14 +850,9 @@
 
   setupPrayerInfo();
   setupWeatherInfo();
+  setupChartPicker();
 
   $$(".tab").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
-  $("#chartSelect").addEventListener("change",e=>{
-    const now = riyadhNowParts();
-    if (e.target.value === "month-temp-dew") { chartState.monthYear = now.year; chartState.month = now.month; }
-    if (e.target.value === "year-temp-rain") chartState.year = now.year;
-    loadChart(e.target.value);
-  });
   $("#chartPrev").addEventListener("click",()=>moveChartPeriod(-1));
   $("#chartNext").addEventListener("click",()=>moveChartPeriod(1));
   const initial=["weather","history","radar","markets","prayer"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "weather";

@@ -1,5 +1,5 @@
 // القائمة الأساسية للأسعار.
-// الأسهم يمكن إضافتها أو تعطيلها من شاشة «الأسعار»؛ العامل يحدّث هذا الملف في GitHub عند تفعيل إدارة القائمة.
+// إدارة الإضافة/الإخفاء تتم يدويًا من هذا الملف بواسطة مالك المشروع.
 window.TAQSS_MARKETS = [
   { symbol: "^TASI.SR", name: "TASI", category: "index", enabled: true },
   { symbol: "^DJI", name: "DJI", category: "index", enabled: true },
