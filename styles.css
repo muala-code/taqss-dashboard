@@ -206,7 +206,7 @@ body.radar-pseudo-fullscreen { overflow: hidden; }
 }
 .moon-section {
   padding-top: .7rem;
-  border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  /* The final prayer row already provides the section separator. */
 }
 .moon-heading {
   display: flex;
