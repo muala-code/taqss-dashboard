@@ -310,9 +310,104 @@
       connection.querySelector(".connection-text").textContent = "تعذر التحقق من اتصال المحطة";
       status.hidden = false;
       status.textContent = `تعذر جلب بيانات الطقس: ${e.message}`;
+      if (selectedWeatherView !== "current") status.hidden = true;
     }
   }
 
+  // v0.20: two views within the existing weather tab; Current is always the default.
+  let selectedWeatherView = "current";
+  let forecastCache = null;
+  let forecastFetchedAt = 0;
+  let forecastRequest = null;
+  function forecastDate(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat("en-GB-u-ca-gregory", {
+      timeZone: cfg.timeZone || "Asia/Riyadh", day: "2-digit", month: "2-digit", year: "numeric"
+    }).format(date).replaceAll("/", "-");
+  }
+  function safeForecastNumber(value) {
+    return value === null || value === undefined || value === "" ? null : finite(value);
+  }
+  function appendForecastDay(container, day, index) {
+    const row = document.createElement("article");
+    row.className = "forecast-day";
+    const heading = document.createElement("div");
+    heading.className = "forecast-heading";
+    const title = document.createElement("strong");
+    title.textContent = index === 0 ? "اليوم" : index === 1 ? "غدًا" : (day.day || `اليوم ${index + 1}`);
+    const date = document.createElement("span");
+    date.className = "forecast-date";
+    date.textContent = forecastDate(day.validTime);
+    heading.append(title, date);
+    const phrase = document.createElement("div");
+    phrase.className = "forecast-phrase";
+    phrase.textContent = day.phrase || "—";
+    const temp = document.createElement("div");
+    temp.className = "forecast-temperatures";
+    const high = document.createElement("span");
+    high.className = "forecast-high";
+    high.textContent = `↑ ${safeForecastNumber(day.max) === null ? "—" : fmt(day.max)} °C`;
+    const low = document.createElement("span");
+    low.className = "forecast-low";
+    low.textContent = `↓ ${safeForecastNumber(day.min) === null ? "—" : fmt(day.min)} °C`;
+    temp.append(high, low);
+    row.append(heading, phrase, temp);
+    const chance = safeForecastNumber(day.precipChance);
+    if (chance !== null) {
+      const rain = document.createElement("div");
+      rain.className = chance >= 40 ? "forecast-rain strong" : "forecast-rain soft";
+      rain.textContent = `🌧️ احتمال المطر ${fmt(chance, 0)}%`;
+      row.append(rain);
+    }
+    container.append(row);
+  }
+  function renderForecast(data) {
+    const list = $("#forecastData");
+    const status = $("#forecastStatus");
+    list.replaceChildren();
+    if (!data?.enabled || !Array.isArray(data.days) || !data.days.length) {
+      status.textContent = data?.message || "لا تتوفر بيانات التوقعات حاليًا.";
+      return;
+    }
+    status.textContent = "";
+    data.days.slice(0, 5).forEach((day, index) => appendForecastDay(list, day, index));
+  }
+  async function loadForecast() {
+    if (forecastCache && Date.now() - forecastFetchedAt < 30 * 60 * 1000) { renderForecast(forecastCache); return; }
+    if (forecastRequest) return forecastRequest;
+    $("#forecastStatus").textContent = "جارٍ جلب التوقعات…";
+    forecastRequest = (async () => {
+      try {
+        const data = await getJson(api("/api/forecast?lang=ar-SA"));
+        forecastCache = data;
+        forecastFetchedAt = Date.now();
+        if (selectedWeatherView === "forecast") renderForecast(data);
+      } catch (error) {
+        $("#forecastStatus").textContent = `تعذر جلب التوقعات: ${error.message}`;
+      } finally {
+        forecastRequest = null;
+      }
+    })();
+    return forecastRequest;
+  }
+  function selectWeatherView(view) {
+    selectedWeatherView = view === "forecast" ? "forecast" : "current";
+    const isCurrent = selectedWeatherView === "current";
+    $("#weatherCurrentView").hidden = !isCurrent;
+    $("#weatherForecastView").hidden = isCurrent;
+    $("#stationConnection").hidden = false;
+    $("#weatherStatus").hidden = !isCurrent || !$("#weatherStatus").textContent;
+    for (const [button, active] of [
+      [$("#weatherCurrentButton"), isCurrent],
+      [$("#weatherForecastButton"), !isCurrent]
+    ]) {
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    }
+    if (!isCurrent) loadForecast();
+  }
   function destroyChart() { if (chart) { chart.destroy(); chart = null; } }
   function chartValues(values) { return values.map(finite).filter(v => v !== null); }
   function paddedRange(values, minPad = 1) {
@@ -451,7 +546,7 @@
 
   const previousMarketPrices = new Map();
   let marketsLoading = false;
-  let openStockSymbol = null;
+  let openMarketSymbol = null;
 
   function marketDirection(q) {
     const pct = finite(q?.changePercent);
@@ -466,6 +561,16 @@
     const clean = Math.abs(n) < 0.005 ? 0 : n;
     return `${clean > 0 ? "+" : ""}${fmt(clean, digits)}${suffix}`;
   }
+  function marketFixed(value) {
+    const n = value === null || value === undefined || value === "" ? null : finite(value);
+    return n === null ? "—" : n.toLocaleString("ar-SA-u-nu-latn", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function marketSignedFixed(value) {
+    const n = value === null || value === undefined || value === "" ? null : finite(value);
+    if (n === null) return "—";
+    const clean = Math.abs(n) < 0.005 ? 0 : n;
+    return `${clean > 0 ? "+" : ""}${marketFixed(clean)}`;
+  }
   function compactVolume(value) {
     const n = finite(value);
     if (n === null) return "—";
@@ -476,14 +581,19 @@
     const h = document.createElement("h3"); h.textContent = title; head.appendChild(h);
     return head;
   }
-  function buildStockDetails(q) {
+  function buildMarketDetails(q) {
     const details = document.createElement("div"); details.className = "market-details"; details.hidden = true;
     const fields = [
       ["الإغلاق السابق", q.previousClose, 2], ["الافتتاح", q.open, 2],
-      ["الأعلى", q.high, 2], ["الأدنى", q.low, 2]
+      ["الأعلى", q.high, 2], ["الأدنى", q.low, 2],
+      ["التغير", q.change, 2]
     ];
     for (const [label, value, digits] of fields) {
-      const cell = document.createElement("span"); cell.innerHTML = `<small>${label}:</small><strong>${fmt(value, digits)}</strong>`; details.appendChild(cell);
+      const cell = document.createElement("span");
+      const shown = label === "التغير" ? marketSignedFixed(value) : marketFixed(value);
+      cell.innerHTML = `<small>${label}:</small><strong>${shown}</strong>`;
+      if (label === "التغير") cell.classList.add(marketDirection(q));
+      details.appendChild(cell);
     }
     const vol = document.createElement("span"); vol.innerHTML = `<small>حجم التداول:</small><strong>${compactVolume(q.volume)}</strong>`; details.appendChild(vol);
     if (q.corporateAction) {
@@ -524,24 +634,27 @@
           if (key === "index") {
             row.innerHTML = `<span class="market-name">${item.name}</span><span class="num market-index-value ${cls}">${fmt(q.price,2)}</span><span class="num ${cls}">${pct === null ? "—" : marketSigned(pct,"%")}</span>`;
           } else {
-            row.innerHTML = `<span class="market-name">${item.name}</span><span class="num ${cls}">${fmt(q.price,2)} ${marketCurrency(q.currency)}</span><span class="num ${cls}">${change === null ? "—" : marketSigned(change)}</span><span class="num ${cls}">${pct === null ? "—" : marketSigned(pct,"%")}</span>`;
-            if (key === "stock") {
-              row.classList.add("stock-row"); row.tabIndex = 0; row.setAttribute("role", "button");
-              const details = buildStockDetails(q);
-              const isOpen = openStockSymbol === item.symbol;
+            // Three columns only: name | last price | colored percent.
+            row.innerHTML = `<span class="market-name">${item.name}</span><span class="num">${marketFixed(q.price)}</span><span class="num ${cls}">${pct === null ? "—" : marketSigned(pct,"%")}</span>`;
+            if (key === "stock" || key === "commodity") {
+              row.classList.add("stock-row", "market-expandable-row");
+              row.tabIndex = 0; row.setAttribute("role", "button");
+              row.setAttribute("aria-label", `${item.name}، عرض التفاصيل`);
+              const details = buildMarketDetails(q);
+              const isOpen = openMarketSymbol === item.symbol;
               details.hidden = !isOpen;
               row.setAttribute("aria-expanded", isOpen ? "true" : "false");
               itemWrap.append(row, details);
               const toggle = () => {
                 const willOpen = details.hidden;
                 root.querySelectorAll(".market-details").forEach(el => { el.hidden = true; });
-                root.querySelectorAll(".stock-row[aria-expanded=\"true\"]").forEach(el => el.setAttribute("aria-expanded", "false"));
+                root.querySelectorAll(".market-expandable-row[aria-expanded=\"true\"]").forEach(el => el.setAttribute("aria-expanded", "false"));
                 if (willOpen) {
                   details.hidden = false;
                   row.setAttribute("aria-expanded", "true");
-                  openStockSymbol = item.symbol;
+                  openMarketSymbol = item.symbol;
                 } else {
-                  openStockSymbol = null;
+                  openMarketSymbol = null;
                 }
               };
               row.addEventListener("click", toggle);
@@ -851,10 +964,122 @@
   setupPrayerInfo();
   setupWeatherInfo();
   setupChartPicker();
+  $("#weatherCurrentButton").addEventListener("click", () => selectWeatherView("current"));
+  $("#weatherForecastButton").addEventListener("click", () => selectWeatherView("forecast"));
 
   $$(".tab").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
   $("#chartPrev").addEventListener("click",()=>moveChartPeriod(-1));
   $("#chartNext").addEventListener("click",()=>moveChartPeriod(1));
   const initial=["weather","history","radar","markets","prayer"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "weather";
   showTab(initial);
+})();
+
+// v0.20.1: forecast-only colors, shared station status, market layout.
+
+
+// taqss-price-sections-v0203: presentation only; no prices or calculation changed.
+(() => {
+  'use strict';
+  const choices = new Map([
+    ['المؤشرات', ['مؤشرات', false]],
+    ['مؤشرات', ['مؤشرات', false]],
+    ['المعادن والطاقة', ['سلع', true]],
+    ['المعادن والسلع', ['سلع', true]],
+    ['معادن وسلع', ['سلع', true]],
+    ['سلع', ['سلع', true]],
+    ['الأسهم', ['أسهم', true]],
+    ['أسهم', ['أسهم', true]],
+  ]);
+  function decorateMarkets() {
+    const panel = document.getElementById('panel-markets');
+    if (!panel) return;
+    // Deepest text nodes only; don't accidentally rename a container or a quote row.
+    for (const el of panel.querySelectorAll('*')) {
+      const raw = el.textContent?.trim().replace(/\s+/g, ' ');
+      if (!choices.has(raw) || el.children.length > 0) continue;
+      if (el.closest('.market-row, .market-details, button, select')) continue;
+      const [shortTitle, separated] = choices.get(raw);
+      // The current UI uses section headings; protect against rewriting unrelated text.
+      const headingSelector = 'h1,h2,h3,h4,h5,h6,.market-section-title,.market-group-title,.market-heading,.section-title,.market-category-title';
+      const heading = el.matches(headingSelector) ? el
+        : (el.parentElement?.matches(headingSelector) ? el.parentElement
+        : (el.matches('div,p,strong') && !el.closest('.market-row,.market-details') ? el : null));
+      if (!heading) continue;
+      heading.classList.add('taqss-market-heading-v0203');
+      if (el.textContent.trim() !== shortTitle) el.textContent = shortTitle;
+      if (separated) {
+        const prev = heading.previousElementSibling;
+        if (!prev?.classList.contains('taqss-market-divider-v0203')) {
+          const separator = document.createElement('div');
+          separator.className = 'taqss-market-divider-v0203';
+          separator.setAttribute('aria-hidden', 'true');
+          heading.before(separator);
+        }
+      }
+    }
+  }
+  function boot() {
+    const panel = document.getElementById('panel-markets');
+    if (!panel) return;
+    let inObserver = false;
+    const observer = new MutationObserver(() => {
+      if (inObserver) return;
+      inObserver = true;
+      observer.disconnect();
+      try { decorateMarkets(); }
+      finally { observer.observe(panel, {childList: true, subtree: true}); inObserver = false; }
+    });
+    decorateMarkets();
+    observer.observe(panel, {childList: true, subtree: true});
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});
+  else boot();
+})();
+
+
+// taqss-last-existing-rule-v0203d: mark the last existing row before each category.
+// The heading/divider observer from v0.20.3 is retained; no extra rules are inserted.
+(() => {
+  'use strict';
+  function updateLastRows() {
+    const panel = document.getElementById('panel-markets');
+    if (!panel) return;
+    panel.querySelectorAll('.market-row.taqss-market-last-v0203d')
+      .forEach(row => {
+        row.classList.remove('taqss-market-last-v0203d');
+        row.style.removeProperty('border-bottom-width');
+        row.style.removeProperty('border-bottom-style');
+        row.style.removeProperty('border-bottom-color');
+      });
+    const rows = [...panel.querySelectorAll('.market-row')];
+    const headings = [...panel.querySelectorAll('.taqss-market-divider-v0203 + .taqss-market-heading-v0203')];
+    for (const heading of headings) {
+      // Last ROW anywhere above the new heading, even if groups use wrappers.
+      const prior = rows.filter(row => !!(row.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING)).pop();
+      if (prior) {
+        // Reuse the color of an ordinary row's existing separator.
+        const priorIndex = rows.indexOf(prior);
+        prior.classList.add('taqss-market-last-v0203d');
+        // Inline important is deliberate: older patches hide the old final line.
+        prior.style.setProperty('border-bottom-width', '2px', 'important');
+        prior.style.setProperty('border-bottom-style', 'solid', 'important');
+        prior.style.setProperty('border-bottom-color', '#cbd0d4', 'important');
+      }
+    }
+  }
+  function boot() {
+    const panel = document.getElementById('panel-markets');
+    if (!panel) return;
+    let queued = false;
+    function schedule() {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => { queued = false; updateLastRows(); });
+    }
+    // Existing app may replace market markup during refresh; keep marker synchronized.
+    new MutationObserver(schedule).observe(panel, {childList:true,subtree:true});
+    schedule();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});
+  else boot();
 })();

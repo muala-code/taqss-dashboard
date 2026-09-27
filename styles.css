@@ -291,3 +291,239 @@ body.radar-pseudo-fullscreen { overflow: hidden; }
   .market-details strong { font-size: .78rem; }
   .prayer-rows > div.next-prayer { grid-template-columns: minmax(0, 1fr) minmax(2.6rem, 17%) auto; gap: .55rem; }
 }
+
+/* v0.20 — inline Current / five-day Forecast switch */
+#panel-weather:has(#weatherForecastButton.active) #weatherStatus { display: none !important; }
+.weather-view-switch {
+  display: grid; grid-template-columns: 1fr 1fr; gap: .3rem;
+  padding: .25rem; margin: .65rem 0 .35rem;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: .7rem;
+  background: color-mix(in srgb, currentColor 4%, Canvas);
+}
+.weather-view-button {
+  min-height: 42px; border: 0; border-radius: .48rem;
+  background: transparent; color: inherit; font: inherit; cursor: pointer;
+}
+.weather-view-button.active {
+  font-weight: 800;
+  background: color-mix(in srgb, #15803d 13%, Canvas);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #15803d 38%, transparent);
+}
+#weatherCurrentView[hidden], #weatherForecastView[hidden], #stationConnection[hidden] { display: none !important; }
+.forecast-list { margin-top: .3rem; }
+.forecast-day {
+  padding: .8rem .15rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+.forecast-heading { display: flex; align-items: baseline; justify-content: space-between; gap: .7rem; }
+.forecast-date { opacity: .7; font-size: .82rem; direction: ltr; }
+.forecast-phrase { margin: .3rem 0; }
+.forecast-temperatures { display: flex; flex-wrap: wrap; gap: 1.25rem; font-weight: 750; }
+.forecast-low { opacity: .7; }
+.forecast-rain { margin-top: .25rem; font-size: .88rem; opacity: .8; }
+.forecast-rain.notable { color: #15803d; font-weight: 700; opacity: 1; }
+/* Prayer countdown stretches responsively between fixed-size prayer name and time. */
+.prayer-rows > div.next-prayer { grid-template-columns: max-content minmax(0, 1fr) max-content; gap: clamp(.4rem, 2vw, 1rem); }
+.prayer-rows > div.next-prayer dt,
+.prayer-rows > div.next-prayer dd { white-space: nowrap; min-width: 0; }
+.prayer-rows > div.next-prayer .prayer-countdown { min-width: 0; width: 100%; }
+@media (max-width: 470px) {
+  .prayer-rows > div.next-prayer { grid-template-columns: max-content minmax(0, 1fr) max-content; gap: clamp(.35rem, 1.5vw, .55rem); }
+}
+
+/* v0.20 final: compact stocks and commodities; indices remain non-expandable. */
+.market-row.stock-row,
+.market-row.market-expandable-row {
+  grid-template-columns: minmax(4.4rem, 1fr) minmax(4.7rem, auto) minmax(3.8rem, auto);
+  gap: clamp(.35rem, 1.7vw, .85rem);
+  align-items: center;
+  cursor: pointer;
+}
+.market-row.market-expandable-row:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.market-row.market-expandable-row .num { white-space: nowrap; }
+.market-row.market-expandable-row .market-name { min-width: 0; overflow-wrap: anywhere; }
+.market-details span.up strong { color: #178346; }
+.market-details span.down strong { color: #c34545; }
+@media (max-width: 470px) {
+  .market-row.stock-row,
+  .market-row.market-expandable-row {
+    grid-template-columns: minmax(4.4rem, 1fr) minmax(4.8rem, auto) minmax(3.9rem, auto);
+    gap: .35rem;
+  }
+}
+
+/* v0.20.1 forecast styles — current measurements are deliberately unchanged. */
+#weatherForecastView .forecast-high { color: #c4493b; font-weight: 800; }
+#weatherForecastView .forecast-low { color: #307dc5; opacity: 1; font-weight: 800; }
+#weatherForecastView .forecast-rain { display: inline-flex; border-radius: .45rem; padding: .2rem .5rem; opacity: 1; }
+#weatherForecastView .forecast-rain.soft { background: rgba(34,139,80,.07); color: #47865d; }
+#weatherForecastView .forecast-rain.strong { background: rgba(24,135,63,.20); color: #14783a; font-weight: 800; }
+/* RTL: name at right, last value centered, percent at far left. */
+#panel-markets .market-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(5.5rem,1fr) minmax(4.4rem,1fr); align-items: center; gap: .35rem; }
+#panel-markets .market-row .market-name { min-width: 0; justify-self: start; text-align: right; }
+#panel-markets .market-row .num:nth-child(2) { justify-self: center; text-align: center; }
+#panel-markets .market-row .num:last-child { justify-self: end; text-align: left; }
+
+/* taqss-price-sections-v0203: headings and category dividers, prices unchanged */
+#panel-markets .taqss-market-heading-v0203 {
+  color: #637f90;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+#panel-markets .taqss-market-divider-v0203 {
+  height: 2px;
+  width: 100%;
+  margin: 1.15rem 0 .65rem;
+  background: #97b7b0;
+  border-radius: 99px;
+}
+
+
+/* taqss-markets-rtl-v0203a — RTL market headings; visual only. */
+#panel-markets .taqss-market-heading-v0203 {
+  direction: rtl !important;
+  text-align: right !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+#panel-markets .taqss-market-divider-v0203 {
+  display: none !important;
+}
+#panel-markets .taqss-market-divider-v0203 + .taqss-market-heading-v0203 {
+  display: flex !important;
+  flex-direction: row !important;
+  direction: rtl !important;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  white-space: nowrap;
+}
+#panel-markets .taqss-market-divider-v0203 + .taqss-market-heading-v0203::after {
+  content: "";
+  display: block;
+  flex: 1 1 auto;
+  min-width: 12px;
+  height: 2px;
+  background: #97b7b0;
+  border-radius: 99px;
+}
+
+
+/* taqss-v0203b-sections-zoom: distinct section separators and map-only gesture. */
+#panel-markets .taqss-market-divider-v0203 {
+  display: block !important;
+  width: 100% !important;
+  height: 2px !important;
+  margin: 1.05rem 0 .58rem !important;
+  background: color-mix(in srgb, currentColor 18%, transparent) !important;
+  border-radius: 0 !important;
+}
+#panel-markets .taqss-market-divider-v0203 + .taqss-market-heading-v0203 {
+  display: block !important;
+  width: 100% !important;
+  text-align: right !important;
+  direction: rtl !important;
+  margin-top: 0 !important;
+}
+#panel-markets .taqss-market-divider-v0203 + .taqss-market-heading-v0203::after {
+  content: none !important;
+  display: none !important;
+}
+/* When rows directly precede the divider, its line replaces their bottom border. */
+#panel-markets .market-row:has(+ .taqss-market-divider-v0203),
+#panel-markets .market-section:has(+ .taqss-market-divider-v0203) .market-row:last-child {
+  border-bottom: 0 !important;
+}
+/* Permit ordinary vertical and horizontal scrolling, but not page pinch zoom. */
+html, body { touch-action: pan-x pan-y; }
+/* Do not block the map's own touch gestures. */
+#panel-radar .leaflet-container,
+#panel-radar .maplibregl-canvas-container,
+#panel-radar .mapboxgl-canvas-container,
+#panel-radar iframe,
+#radarMap, #radar-map, .radar-map { touch-action: auto !important; }
+
+
+/* taqss-sections-v0203c-final: separator ends previous list; heading on its own line. */
+#panel-markets .taqss-market-divider-v0203 {
+  display: block !important;
+  clear: both !important;
+  width: 100% !important;
+  height: 0 !important;
+  border: 0 !important;
+  border-top: 2px solid color-mix(in srgb, currentColor 18%, transparent) !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-sizing: border-box !important;
+  /* Close to the old section; breathing space comes AFTER the rule. */
+  margin: 0 0 1.15rem 0 !important;
+}
+#panel-markets .taqss-market-divider-v0203 + .taqss-market-heading-v0203 {
+  display: block !important;
+  direction: rtl !important;
+  text-align: right !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin: 0 0 .7rem 0 !important;
+  padding: 0 !important;
+}
+#panel-markets .taqss-market-divider-v0203 + .taqss-market-heading-v0203::before,
+#panel-markets .taqss-market-divider-v0203 + .taqss-market-heading-v0203::after {
+  display: none !important;
+  content: none !important;
+}
+/* Neutralize last item border so category boundary has one rule, not two. */
+#panel-markets .market-row:has(+ .taqss-market-divider-v0203),
+#panel-markets .market-section:has(+ .taqss-market-divider-v0203) .market-row:last-child {
+  border-bottom: 0 !important;
+}
+
+
+/* taqss-last-existing-rule-v0203d: use the prior category's own last row border. */
+/* The dividers generated by v0.20.3 remain in DOM only for locating headings. */
+#panel-markets .taqss-market-divider-v0203 { display: none !important; }
+#panel-markets .taqss-market-divider-v0203 + .taqss-market-heading-v0203 {
+  display: block !important;
+  width: 100% !important;
+  direction: rtl !important;
+  text-align: right !important;
+  margin: 1.05rem 0 .7rem !important;
+  padding: 0 !important;
+}
+#panel-markets .taqss-market-heading-v0203::before,
+#panel-markets .taqss-market-heading-v0203::after {
+  display: none !important;
+  content: none !important;
+}
+/* Increase thickness without touching the line's original color. */
+#panel-markets .market-row.taqss-market-last-v0203d {
+  border-bottom-style: solid !important;
+  border-bottom-width: 2px !important;
+}
+/* The earlier patches hid the last border to replace it with a second line.
+   This higher-specificity rule restores precisely the original last-row line. */
+#panel-markets .market-row.taqss-market-last-v0203d:has(~ .taqss-market-divider-v0203),
+#panel-markets .market-section .market-row.taqss-market-last-v0203d {
+  border-bottom-style: solid !important;
+  border-bottom-width: 2px !important;
+}
+
+/* taqss-sections-v0203e: the EXISTING last-row border ends the previous category. */
+#panel-markets .taqss-market-divider-v0203 { display: none !important; }
+#panel-markets .market-row.taqss-market-last-v0203d {
+  border-bottom: 2px solid #cbd0d4 !important;
+}
+#panel-markets .taqss-market-divider-v0203 + .taqss-market-heading-v0203 {
+  display: block !important;
+  direction: rtl !important;
+  text-align: right !important;
+  width: 100% !important;
+  margin: .35rem 0 .45rem !important;
+  padding: 0 !important;
+}
+#panel-markets .taqss-market-heading-v0203::before,
+#panel-markets .taqss-market-heading-v0203::after {
+  display: none !important;
+  content: none !important;
+}

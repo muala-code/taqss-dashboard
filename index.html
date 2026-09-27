@@ -2,12 +2,12 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
   <meta name="theme-color" content="#ffffff">
   <title>طقس داشبورد</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌡️</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=0.19">
+  <link rel="stylesheet" href="styles.css?v=0.20.3e">
 </head>
 <body>
   <nav class="tabs" aria-label="التبويبات الرئيسية">
@@ -31,7 +31,17 @@
         <p id="stationConnection" class="station-connection"><span class="connection-dot"></span><span class="connection-text">جارٍ التحقق من اتصال المحطة…</span></p>
         <p id="weatherStatus" class="status" hidden></p>
       </div>
-      <dl id="weatherData" class="rows weather-rows"></dl>
+      <div id="weatherViewSwitch" class="weather-view-switch" role="group" aria-label="عرض الطقس">
+        <button id="weatherCurrentButton" type="button" class="weather-view-button active" aria-pressed="true">الحالية</button>
+        <button id="weatherForecastButton" type="button" class="weather-view-button" aria-pressed="false">التوقعات</button>
+      </div>
+      <div id="weatherCurrentView">
+        <dl id="weatherData" class="rows weather-rows"></dl>
+      </div>
+      <div id="weatherForecastView" hidden>
+        <p id="forecastStatus" class="status" role="status"></p>
+        <div id="forecastData" class="forecast-list"></div>
+      </div>
     </section>
 
     <section id="panel-history" class="panel" hidden>
@@ -100,9 +110,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="config.js?v=0.19"></script>
-  <script src="markets-config.js?v=0.19"></script>
-  <script src="app.js?v=0.19"></script>
-  <script src="radar.js?v=0.19"></script>
+  <script src="config.js?v=0.20.1"></script>
+  <script src="markets-config.js?v=0.20.1"></script>
+  <script src="app.js?v=0.20.3e"></script>
+  <script src="radar.js?v=0.20.1"></script>
 </body>
 </html>
