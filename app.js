@@ -214,6 +214,24 @@
     if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
     return data;
   }
+
+  function updateStickyOffsets() {
+    const tabs = document.querySelector(".tabs");
+    const height = tabs ? Math.ceil(tabs.getBoundingClientRect().height) : 0;
+    document.documentElement.style.setProperty("--tabs-height", `${height}px`);
+    // The prayer title is fixed, so size it against the visible panel's content box.
+    const panel = document.querySelector("#panel-prayer");
+    if (panel && !panel.hidden) {
+      const rect = panel.getBoundingClientRect();
+      document.documentElement.style.setProperty("--prayer-heading-left", `${rect.left}px`);
+      document.documentElement.style.setProperty("--prayer-heading-width", `${rect.width}px`);
+      const heading = document.querySelector(".prayer-secondary-sticky");
+      if (heading) {
+        document.documentElement.style.setProperty("--prayer-heading-height", `${Math.ceil(heading.getBoundingClientRect().height)}px`);
+      }
+    }
+  }
+
   function addRow(dl, label, value) {
     const div = document.createElement("div");
     const dt = document.createElement("dt");
@@ -258,18 +276,28 @@
     return String(value);
   }
 
-  async function loadWeather() {
+  let weatherRequest = null;
+  let weatherLastAttempt = 0;
+  async function loadWeather({silent = false} = {}) {
+    if (weatherRequest) return weatherRequest;
+    weatherLastAttempt = Date.now();
+    weatherRequest = (async () => {
     const status = $("#weatherStatus"), dl = $("#weatherData"), connection = $("#stationConnection");
     $("#stationLocation").textContent = cfg.stationLocation || "—";
-    status.hidden = true; status.textContent = ""; dl.innerHTML = "";
-    connection.className = "station-connection loading";
-    connection.querySelector(".connection-text").textContent = "جارٍ التحقق من اتصال المحطة…";
+    if (!silent) {
+      status.hidden = true; status.textContent = ""; dl.innerHTML = "";
+      connection.className = "station-connection loading";
+      connection.querySelector(".connection-text").textContent = "جارٍ التحقق من اتصال المحطة…";
+    }
     try {
       const d = await getJson(api("/api/weather"));
+      // Keep the existing readings visible until a successful replacement is ready.
+      dl.replaceChildren();
+      status.hidden = true; status.textContent = "";
       const connected = d.stationConnected !== false;
       const readAt = d.observedAt ? formatUpdateTime(d.observedAt) : "—";
       connection.className = `station-connection ${connected ? "connected" : "disconnected"}`;
-      connection.querySelector(".connection-text").textContent = `${connected ? "المحطة متصلة" : "المحطة غير متصلة"} · آخر قراءة: ${readAt}`;
+      connection.querySelector(".connection-text").innerHTML = `${connected ? "المحطة متصلة" : "المحطة غير متصلة"} · <span class="connection-read-time">آخر قراءة: <span class="connection-read-time-value">${readAt}</span></span>`;
 
       // ترتيب منطقي سريع القراءة على الجوال.
       const condition = weatherCondition(d) || "—";
@@ -306,12 +334,16 @@
         }
       }
     } catch (e) {
-      connection.className = "station-connection disconnected";
-      connection.querySelector(".connection-text").textContent = "تعذر التحقق من اتصال المحطة";
+      if (!silent || !dl.children.length) {
+        connection.className = "station-connection disconnected";
+        connection.querySelector(".connection-text").textContent = "تعذر التحقق من اتصال المحطة";
+      }
       status.hidden = false;
       status.textContent = `تعذر جلب بيانات الطقس: ${e.message}`;
       if (selectedWeatherView !== "current") status.hidden = true;
     }
+    })();
+    try { return await weatherRequest; } finally { weatherRequest = null; }
   }
 
   // v0.20: two views within the existing weather tab; Current is always the default.
@@ -353,14 +385,16 @@
     low.className = "forecast-low";
     low.textContent = `↓ ${safeForecastNumber(day.min) === null ? "—" : fmt(day.min)} °C`;
     temp.append(high, low);
-    row.append(heading, phrase, temp);
+    row.append(heading, phrase);
     const chance = safeForecastNumber(day.precipChance);
     if (chance !== null) {
-      const rain = document.createElement("div");
+      const rain = document.createElement("span");
       rain.className = chance >= 40 ? "forecast-rain strong" : "forecast-rain soft";
-      rain.textContent = `🌧️ احتمال المطر ${fmt(chance, 0)}%`;
-      row.append(rain);
+      rain.textContent = `فرصة المطر: ${fmt(chance, 0)}% 🌧️`;
+      rain.setAttribute("aria-label", `فرصة المطر ${fmt(chance, 0)} بالمئة`);
+      temp.append(rain);
     }
+    row.append(temp);
     container.append(row);
   }
   function renderForecast(data) {
@@ -407,6 +441,7 @@
       button.setAttribute("aria-pressed", String(active));
     }
     if (!isCurrent) loadForecast();
+    syncWeatherRefresh();
   }
   function destroyChart() { if (chart) { chart.destroy(); chart = null; } }
   function chartValues(values) { return values.map(finite).filter(v => v !== null); }
@@ -607,6 +642,49 @@
     if (n !== null) previousMarketPrices.set(symbol, n);
   }
 
+  function buildIndexTicker(indices, bySymbol) {
+    const area = document.createElement("section");
+    area.className = "index-ticker";
+    area.setAttribute("aria-label", "المؤشرات");
+    const viewport = document.createElement("div");
+    viewport.className = "index-ticker-viewport";
+    viewport.tabIndex = 0;
+    viewport.setAttribute("aria-label", "مؤشرات السوق، شريط متحرك يتوقف عند تمرير المؤشر أو التركيز عليه");
+    const track = document.createElement("div");
+    track.className = "index-ticker-track";
+    const createSet = (duplicate = false) => {
+      const set = document.createElement("div");
+      set.className = "index-ticker-set";
+      if (duplicate) set.setAttribute("aria-hidden", "true");
+      // Repeat to fill even a wide landscape viewport without an empty interval.
+      for (let cycle = 0; cycle < 3; cycle++) {
+        for (const item of indices) {
+          const q = bySymbol.get(item.symbol) || {};
+          const direction = marketDirection(q);
+          const pct = finite(q.changePercent);
+          const segment = document.createElement("span");
+          segment.className = "index-ticker-item";
+          if (cycle > 0) segment.setAttribute("aria-hidden", "true");
+          const name = document.createElement("strong");
+          name.textContent = item.name;
+          const price = document.createElement("span");
+          price.className = `index-ticker-value ${direction}`;
+          price.textContent = fmt(q.price, 2);
+          const change = document.createElement("span");
+          change.className = `index-ticker-change ${direction}`;
+          change.textContent = pct === null ? "—" : marketSigned(pct, "%");
+          segment.append(name, price, change);
+          set.appendChild(segment);
+        }
+      }
+      return set;
+    };
+    track.append(createSet(), createSet(true));
+    viewport.appendChild(track);
+    area.appendChild(viewport);
+    return area;
+  }
+
   async function loadMarkets({silent=false} = {}) {
     const status = $("#marketsStatus"), root = $("#marketsData");
     if (marketsLoading) return;
@@ -620,7 +698,9 @@
       const d = await getJson(`${base}/api/markets?symbols=${encodeURIComponent(symbols)}`);
       const bySymbol = new Map((d.items || []).map(x => [x.symbol, x]));
       const frag = document.createDocumentFragment();
-      const groups = [["index","المؤشرات"],["commodity","المعادن والطاقة"],["stock","الأسهم"]];
+      const indices = visible.filter(x => x.category === "index");
+      if (indices.length) frag.appendChild(buildIndexTicker(indices, bySymbol));
+      const groups = [["commodity","المعادن والطاقة"],["stock","الأسهم"]];
       for (const [key,title] of groups) {
         const section = document.createElement("section"); section.className="market-group";
         section.appendChild(buildMarketHeader(title));
@@ -941,6 +1021,34 @@
   function setupPrayerInfo() { setupInfoToggle("#prayerInfoButton", "#prayerInfoBubble"); }
   function setupWeatherInfo() { setupInfoToggle("#weatherInfoButton", "#weatherInfoBubble"); }
 
+  // Refresh only while the current weather panel is actually in view.
+  const WEATHER_REFRESH_MS = 60 * 1000;
+  let weatherTimer = null;
+  function weatherIsActive() {
+    return document.visibilityState === "visible" &&
+      !document.querySelector("#panel-weather").hidden &&
+      selectedWeatherView === "current";
+  }
+  function refreshVisibleWeather(force = false) {
+    if (weatherIsActive() && (force || Date.now() - weatherLastAttempt >= WEATHER_REFRESH_MS)) {
+      return loadWeather({silent: loaded.has("weather")});
+    }
+  }
+  function syncWeatherRefresh() {
+    if (weatherTimer !== null) clearInterval(weatherTimer);
+    weatherTimer = null;
+    if (!weatherIsActive()) return;
+    refreshVisibleWeather();
+    weatherTimer = setInterval(() => refreshVisibleWeather(), WEATHER_REFRESH_MS);
+  }
+  document.addEventListener("visibilitychange", syncWeatherRefresh);
+  window.addEventListener("focus", syncWeatherRefresh);
+  window.addEventListener("blur", () => {
+    // Visibility can remain 'visible' on some TVs; suspend during window blur.
+    if (weatherTimer !== null) clearInterval(weatherTimer);
+    weatherTimer = null;
+  });
+
   function showTab(name) {
     if (name !== "radar") document.dispatchEvent(new CustomEvent("taqss:radar-close"));
     if (name !== "markets") stopMarketsRefresh();
@@ -959,6 +1067,8 @@
       if (name==="markets") loadMarkets({silent:true});
     }
     if (name === "markets") startMarketsRefresh();
+    updateStickyOffsets();
+    syncWeatherRefresh();
   }
 
   setupPrayerInfo();
@@ -966,6 +1076,12 @@
   setupChartPicker();
   $("#weatherCurrentButton").addEventListener("click", () => selectWeatherView("current"));
   $("#weatherForecastButton").addEventListener("click", () => selectWeatherView("forecast"));
+  updateStickyOffsets();
+  window.addEventListener("resize", updateStickyOffsets, { passive: true });
+  if (typeof ResizeObserver !== "undefined") {
+    const prayerHeader = document.querySelector(".prayer-secondary-sticky");
+    if (prayerHeader) new ResizeObserver(updateStickyOffsets).observe(prayerHeader);
+  }
 
   $$(".tab").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
   $("#chartPrev").addEventListener("click",()=>moveChartPeriod(-1));

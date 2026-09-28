@@ -1,4 +1,4 @@
-:root { color-scheme: light dark; }
+:root { color-scheme: light dark; --tabs-height: 0px; }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: system-ui, sans-serif; line-height: 1.45; }
 .tabs {
@@ -24,7 +24,17 @@ body { margin: 0; font-family: system-ui, sans-serif; line-height: 1.45; }
 main { width: min(100%, 760px); margin-inline: auto; padding: 1rem; }
 .panel[hidden] { display: none !important; }
 .identity { margin: .25rem 0; }
-.weather-intro { margin-bottom: .45rem; }
+.weather-intro { margin-bottom: .35rem; }
+.weather-secondary-sticky {
+  position: sticky;
+  top: var(--tabs-height);
+  z-index: 950;
+  background: Canvas;
+  padding: .2rem 0 .35rem;
+  margin: -.2rem 0 .45rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
 .weather-location-line { display: flex; align-items: center; gap: .35rem; min-width: 0; }
 .weather-location { margin: 0; min-width: 0; }
 .weather-info-bubble {
@@ -39,6 +49,8 @@ main { width: min(100%, 760px); margin-inline: auto; padding: 1rem; }
   display: flex; align-items: center; gap: .4rem; margin: .4rem 0 .15rem;
   font-size: .82rem; opacity: .76; direction: rtl;
 }
+.connection-read-time { color: inherit; }
+.connection-read-time-value { color: #2563eb; font-weight: 750; }
 .connection-dot { width: .55rem; height: .55rem; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
 .station-connection.connected .connection-dot { background: #15803d; }
 .station-connection.disconnected .connection-dot { background: #b91c1c; }
@@ -296,7 +308,7 @@ body.radar-pseudo-fullscreen { overflow: hidden; }
 #panel-weather:has(#weatherForecastButton.active) #weatherStatus { display: none !important; }
 .weather-view-switch {
   display: grid; grid-template-columns: 1fr 1fr; gap: .3rem;
-  padding: .25rem; margin: .65rem 0 .35rem;
+  padding: .25rem; margin: .55rem 0 .05rem;
   border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
   border-radius: .7rem;
   background: color-mix(in srgb, currentColor 4%, Canvas);
@@ -319,9 +331,9 @@ body.radar-pseudo-fullscreen { overflow: hidden; }
 .forecast-heading { display: flex; align-items: baseline; justify-content: space-between; gap: .7rem; }
 .forecast-date { opacity: .7; font-size: .82rem; direction: ltr; }
 .forecast-phrase { margin: .3rem 0; }
-.forecast-temperatures { display: flex; flex-wrap: wrap; gap: 1.25rem; font-weight: 750; }
+.forecast-temperatures { display: flex; flex-wrap: wrap; gap: .8rem 1rem; align-items: center; font-weight: 750; }
 .forecast-low { opacity: .7; }
-.forecast-rain { margin-top: .25rem; font-size: .88rem; opacity: .8; }
+.forecast-rain { margin-top: .18rem; font-size: .88rem; opacity: .95; direction: rtl; }
 .forecast-rain.notable { color: #15803d; font-weight: 700; opacity: 1; }
 /* Prayer countdown stretches responsively between fixed-size prayer name and time. */
 .prayer-rows > div.next-prayer { grid-template-columns: max-content minmax(0, 1fr) max-content; gap: clamp(.4rem, 2vw, 1rem); }
@@ -526,4 +538,102 @@ html, body { touch-action: pan-x pan-y; }
 #panel-markets .taqss-market-heading-v0203::after {
   display: none !important;
   content: none !important;
+}
+
+/* Next UI patch: compact five-day forecast; rain stays alongside high and low. */
+#weatherForecastView .forecast-day { padding-block: .58rem !important; }
+#weatherForecastView .forecast-phrase { margin: .18rem 0 .24rem; }
+#weatherForecastView .forecast-temperatures {
+  display: flex; align-items: center; flex-wrap: nowrap;
+  justify-content: flex-start; gap: clamp(.32rem, 2.3vw, .9rem);
+  white-space: nowrap;
+}
+#weatherForecastView .forecast-rain { margin: 0; padding: .1rem .3rem; font-size: .92em; }
+@media (max-width: 355px) {
+  #weatherForecastView .forecast-temperatures { gap: .24rem; }
+}
+
+/* v0.20.6-test: one-line continuously scrolling index ticker above commodities. */
+#panel-markets .index-ticker {
+  position: sticky;
+  top: var(--tabs-height, 0px);
+  z-index: 950;
+  width: 100%; overflow: hidden;
+  margin: .1rem 0 .8rem;
+  border-block: 1px solid color-mix(in srgb, currentColor 17%, transparent);
+  /* An opaque background keeps scrolling prices and rows from showing through. */
+  background: Canvas;
+  box-shadow: 0 2px 4px color-mix(in srgb, currentColor 5%, transparent);
+}
+#panel-markets .index-ticker-viewport { overflow: hidden; direction: rtl; outline-offset: -2px; }
+#panel-markets .index-ticker-track {
+  display: flex; width: max-content;
+  animation: indices-scroll 48s linear infinite;
+  will-change: transform;
+}
+#panel-markets .index-ticker-set { display: flex; flex: 0 0 auto; align-items: center; }
+#panel-markets .index-ticker-item {
+  display: inline-flex; align-items: baseline; flex: 0 0 auto;
+  gap: .48rem; padding: .52rem 1.05rem;
+  white-space: nowrap; font-size: .93rem;
+  font-variant-numeric: tabular-nums;
+}
+#panel-markets .index-ticker-item::after {
+  content: "•"; opacity: .3; margin-inline-start: .5rem;
+}
+#panel-markets .index-ticker-item strong { font-weight: 750; }
+#panel-markets .index-ticker-value { font-weight: 700; direction: ltr; unicode-bidi: isolate; }
+#panel-markets .index-ticker-change { font-weight: 750; direction: ltr; unicode-bidi: isolate; }
+#panel-markets .index-ticker-item .up { color: #15803d; }
+#panel-markets .index-ticker-item .down { color: #b91c1c; }
+/* Each of the two identical sets spans half the track. */
+@keyframes indices-scroll { from { transform: translateX(0); } to { transform: translateX(50%); } }
+#panel-markets .index-ticker-viewport:hover .index-ticker-track,
+#panel-markets .index-ticker-viewport:active .index-ticker-track,
+#panel-markets .index-ticker-viewport:focus .index-ticker-track,
+#panel-markets .index-ticker-viewport:focus-within .index-ticker-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  #panel-markets .index-ticker-viewport { overflow-x: auto; }
+  #panel-markets .index-ticker-track { animation: none; }
+  #panel-markets .index-ticker-set[aria-hidden="true"] { display: none; }
+}
+
+/* v0.20.8 — keep prayer title and both calendar dates below the navigation bar. */
+#panel-prayer .prayer-secondary-sticky {
+  position: sticky;
+  top: var(--tabs-height, 0px);
+  z-index: 950;
+  background: Canvas;
+  padding: .2rem 0 .3rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+#panel-prayer .prayer-secondary-sticky .date-summary {
+  margin-bottom: 0;
+  padding-bottom: .3rem;
+  border-bottom: none; /* one separation line, shared by the sticky heading */
+}
+#panel-prayer .prayer-section { margin-top: .2rem; }
+#panel-prayer .prayer-secondary-sticky h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+@media (max-width: 470px) {
+  #panel-prayer .prayer-secondary-sticky h2 { font-size: 1.08rem; }
+}
+
+/* v0.20.9: Pin prayer heading independently of document scrolling.
+   Its in-flow spacer prevents the timetable from jumping underneath it. */
+#panel-prayer .prayer-secondary-sticky {
+  position: fixed;
+  top: var(--tabs-height, 62px);
+  left: var(--prayer-heading-left, 1rem);
+  width: var(--prayer-heading-width, calc(100% - 2rem));
+  z-index: 950;
+  margin: 0;
+  box-sizing: border-box;
+}
+#panel-prayer .prayer-sticky-spacer {
+  display: block;
+  height: var(--prayer-heading-height, 4.6rem);
 }
