@@ -627,7 +627,10 @@
       const cell = document.createElement("span");
       const shown = label === "التغير" ? marketSignedFixed(value) : marketFixed(value);
       cell.innerHTML = `<small>${label}:</small><strong>${shown}</strong>`;
-      if (label === "التغير") cell.classList.add(marketDirection(q));
+    if (label === "التغير") {
+  const direction = marketDirection(q);
+  if (direction) cell.classList.add(direction);
+}
       details.appendChild(cell);
     }
     const vol = document.createElement("span"); vol.innerHTML = `<small>حجم التداول:</small><strong>${compactVolume(q.volume)}</strong>`; details.appendChild(vol);
