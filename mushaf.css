@@ -1,0 +1,455 @@
+#panel-mushaf { --mushaf-type-size: 31px; }
+.mushaf-toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:.6rem; padding: .25rem 0 .55rem; }
+.mushaf-heading { display:flex; flex-direction:column; gap:.12rem; }
+.mushaf-heading strong { font-size:1.12rem; }
+.mushaf-heading small, .mushaf-source-note { font-size:.76rem; opacity:.74; }
+.mushaf-mode { display:flex; gap:.25rem; border:1px solid color-mix(in srgb,currentColor 20%,transparent); padding:.2rem; border-radius:.55rem; }
+.mushaf-mode button { padding:.4rem .75rem; border:0; border-radius:.4rem; font:inherit; color:inherit; background:transparent; cursor:pointer; }
+.mushaf-mode button.active { background:color-mix(in srgb,#15803d 15%,Canvas); font-weight:750; }
+.mushaf-source-note { margin:.1rem 0 .75rem; }
+.mushaf-font-controls { display:flex; align-items:center; gap:.65rem; margin:.55rem 0; font-size:.84rem; }
+.mushaf-font-controls[hidden] {display:none;}
+.mushaf-font-controls input {flex:1; min-width:0; max-width:220px;}
+/* Use the user's separately downloaded DigitalKhatt font only for page mode.
+   Font is not included in this patch: copy your own downloaded file to mushaf-fonts/. */
+@font-face {
+  font-family: 'Taqss DigitalKhatt';
+  src: url('mushaf-fonts/digital-khatt-v2.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+.mushaf-reading { border:1px solid color-mix(in srgb,currentColor 16%,transparent); border-radius:.7rem; padding:1rem .8rem; min-height:255px; background:color-mix(in srgb,#e7cfa3 6%,Canvas); }
+.mushaf-reading h2 { text-align:center; font-size:1.12rem; margin:.25rem 0 1.25rem; }
+.mushaf-status { text-align:center; font-size:.85rem; line-height:1.75; opacity:.8; }
+.mushaf-page-mode .mushaf-verses { text-align:justify; text-align-last:center; line-height:2.55; font-family:'Taqss DigitalKhatt','Amiri','Traditional Arabic',serif; font-size:clamp(26px,5.5vw,36px); font-weight:400; }
+.mushaf-text-mode .mushaf-verses { text-align:right; line-height:2.25; font-family:'Amiri','Traditional Arabic',serif; font-size:var(--mushaf-type-size); }
+.mushaf-verse { cursor:pointer; border-radius:.2rem; color:inherit; transition:color .18s; }
+.mushaf-text-mode .mushaf-verse { display:block; margin:.45rem 0; padding:.12rem .1rem; }
+.mushaf-verse:focus-visible { outline:2px solid #138055; outline-offset:3px; }
+.mushaf-verse.is-selected, .mushaf-verse.is-playing { color:#147c4e; }
+.mushaf-verse-number { font-family:system-ui,sans-serif; font-size:.49em; color:color-mix(in srgb,currentColor 75%,transparent); margin:0 .16em; white-space:nowrap; }
+.mushaf-reading-tools { display:flex; flex-wrap:wrap; align-items:center; gap:.55rem; margin:.75rem 0; }
+.mushaf-reading-tools button { font:inherit; padding:.48rem .65rem; background:Canvas; color:inherit; border:1px solid color-mix(in srgb,currentColor 28%,transparent); border-radius:.4rem; }
+.mushaf-reading-tools button:disabled {opacity:.4;}
+#mushafPosition { font-size:.8rem; opacity:.72; margin-inline-start:auto; }
+.mushaf-import { display:grid; gap:.35rem; margin-top:.9rem; padding:.8rem; border:1px dashed color-mix(in srgb,currentColor 23%,transparent); border-radius:.5rem; }
+.mushaf-import label { font-size:.85rem; font-weight:650; }
+.mushaf-import input { max-width:100%; font-size:.8rem; }
+.mushaf-import small { opacity:.75; }
+.mushaf-audio-plan { margin:1.2rem 0; padding:.75rem; background:color-mix(in srgb,currentColor 4%,Canvas); border-radius:.5rem; font-size:.85rem; }
+.mushaf-audio-plan p { margin:.25rem 0 0; line-height:1.6; }
+@media(max-width:380px) { .mushaf-mode {width:100%;} .mushaf-mode button {flex:1;} }
+
+/* v0.21.1: Full-screen reading in both display modes. */
+.mushaf-reading-header { position:relative; display:flex; align-items:center; justify-content:center; min-height:2.9rem; margin:0 0 1rem; padding-inline:6.25rem; }
+.mushaf-reading-header h2 { margin:0; text-align:center; }
+.mushaf-fullscreen-button { position:absolute; inset-inline-end:0; top:0; display:inline-flex; align-items:center; gap:.25rem; padding:.4rem .5rem; border:1px solid color-mix(in srgb,currentColor 25%,transparent); border-radius:.35rem; background:Canvas; color:inherit; font:inherit; font-size:.78rem; cursor:pointer; }
+.mushaf-reading:is(:fullscreen, .is-mushaf-fullscreen) { box-sizing:border-box; width:100vw; height:100vh; height:100dvh; max-height:100dvh; margin:0; padding:max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); overflow:auto; border:0; border-radius:0; background:Canvas; color:CanvasText; overscroll-behavior:contain; }
+.mushaf-reading.is-mushaf-fullscreen { position:fixed; inset:0; z-index:99999; }
+body.mushaf-fullscreen-fallback { overflow:hidden; }
+.mushaf-reading:is(:fullscreen, .is-mushaf-fullscreen) .mushaf-reading-header { position:sticky; top:0; z-index:2; background:Canvas; padding-block:.4rem; }
+.mushaf-reading:is(:fullscreen, .is-mushaf-fullscreen) .mushaf-verses { max-width:850px; margin-inline:auto; }
+@media (max-width:420px) { .mushaf-reading-header { padding-inline:5rem; } .mushaf-fullscreen-button span { display:none; } }
+
+/* v0.21.4: full Quran browser; development only, text awaits independent verification. */
+#panel-mushaf { --mushaf-type-size:31px; }
+#panel-mushaf .mushaf-app-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.65rem; margin-bottom:.4rem; }
+#panel-mushaf .mushaf-app-head strong { font-size:1.1rem; }
+#panel-mushaf .mushaf-source-note { font-size:.77rem; opacity:1; color:#9a4d20; line-height:1.65; margin:.2rem 0 .75rem; }
+#panel-mushaf .mushaf-navigation { display:flex; gap:.45rem; flex-wrap:wrap; align-items:end; padding:.5rem 0; }
+#panel-mushaf .mushaf-navigation label { display:grid; gap:.18rem; min-width:0; font-size:.77rem; }
+#panel-mushaf .mushaf-navigation select, #panel-mushaf .mushaf-navigation input { font:inherit; font-size:.9rem; color:inherit; background:Canvas; border:1px solid color-mix(in srgb,currentColor 28%,transparent); border-radius:.38rem; padding:.45rem; height:2.45rem; }
+#panel-mushaf #mushafSurah { width:min(45vw,13rem); }
+#panel-mushaf #mushafJuz { width:6.2rem; }
+#panel-mushaf #mushafPage { width:4.6rem; }
+#panel-mushaf #mushafGoPage { font:inherit; color:inherit; background:Canvas; border:1px solid color-mix(in srgb,currentColor 25%,transparent); border-radius:.4rem; padding:.43rem .7rem; height:2.45rem; }
+#panel-mushaf .mushaf-reading { background:Canvas; }
+#panel-mushaf .mushaf-reading-header h2 { font-family:system-ui,sans-serif; }
+#panel-mushaf .mushaf-surah-heading { text-align:center; font:bold .82em/2 system-ui,sans-serif; margin:1rem 0 .1rem; }
+#panel-mushaf .mushaf-basmala { text-align:center; display:block; margin:.45rem 0 .8rem; font-family:'Taqss DigitalKhatt','Traditional Arabic',serif; font-size:1em; }
+#panel-mushaf .mushaf-verse.mushaf-fatiha-basmala { display:block; text-align:center; margin:.15rem 0 .8rem; }
+#panel-mushaf .mushaf-page-mode .mushaf-verses { font-size:clamp(23px,5vw,var(--mushaf-type-size)); line-height:2.55; text-align:justify; text-align-last:center; }
+#panel-mushaf .mushaf-verse { white-space:normal; }
+/* Manual selection is not audio tracking: never color a verse until real timed audio is integrated. */
+#panel-mushaf .mushaf-verse.is-selected, #panel-mushaf .mushaf-verse.is-manually-selected { color:inherit; background:transparent; }
+#panel-mushaf .mushaf-verse:focus-visible { outline:1px dotted #168050; }
+#panel-mushaf .mushaf-verse-number { color:#36835b; }
+#panel-mushaf .mushaf-page-controls { display:flex; justify-content:space-between; align-items:center; gap:.5rem; border-top:1px solid color-mix(in srgb,currentColor 15%,transparent); padding:.65rem .2rem .1rem; margin-top:1.2rem; font: .86rem system-ui,sans-serif; }
+#panel-mushaf .mushaf-page-controls button { min-width:4.6rem; padding:.4rem .55rem; font:inherit; color:inherit; background:Canvas; border:1px solid color-mix(in srgb,currentColor 24%,transparent); border-radius:.4rem; }
+#panel-mushaf .mushaf-page-controls button:disabled { opacity:.4; }
+#panel-mushaf .mushaf-page-note { font-size:.73rem; opacity:.7; line-height:1.55; }
+#panel-mushaf .mushaf-listening { border:1px solid color-mix(in srgb,currentColor 17%,transparent); border-radius:.6rem; padding:.7rem; margin:.4rem 0 .75rem; font-size:.84rem; background:color-mix(in srgb,currentColor 3%,Canvas); }
+#panel-mushaf .mushaf-listening[hidden] { display:none; }
+#panel-mushaf .mushaf-listening p { margin:.45rem 0; line-height:1.65; }
+#panel-mushaf .mushaf-audio-placeholder { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; }
+#panel-mushaf .mushaf-audio-placeholder button { font:inherit; padding:.45rem .65rem; border-radius:.4rem; }
+#panel-mushaf .mushaf-audio-placeholder span { opacity:.7; font-size:.8rem; }
+#panel-mushaf .mushaf-reading:is(:fullscreen,.is-mushaf-fullscreen) { overflow:auto; }
+@media(max-width:390px){ #panel-mushaf .mushaf-navigation { gap:.35rem; } #panel-mushaf #mushafSurah { width:42vw; } #panel-mushaf .mushaf-mode button { padding:.4rem .5rem; } }
+
+/* v0.21.5 — local official KFGQPC font. Obtain it from your own official zip. */
+@font-face { font-family: 'Taqss KFGQPC Hafs'; src: url('mushaf-fonts/kfgqpc_hafs_v30.ttf') format('truetype'); font-display: swap; }
+#panel-mushaf .mushaf-page-mode .mushaf-verses,
+#panel-mushaf .mushaf-basmala { font-family: 'Taqss KFGQPC Hafs','Taqss DigitalKhatt','Traditional Arabic',serif; font-weight:400; }
+#panel-mushaf .mushaf-text-mode .mushaf-verses { font-family:'Taqss KFGQPC Hafs','Traditional Arabic',serif; }
+#panel-mushaf .mushaf-verse { unicode-bidi: isolate; }
+
+/* v0.21.6: fluid text; no printed-page boundaries or cluttered page navigation. */
+#panel-mushaf .mushaf-app-head { margin-bottom:.42rem; }
+#panel-mushaf .mushaf-source-note { margin:.1rem 0 .4rem; font-size:.72rem; }
+#panel-mushaf .mushaf-navigation { align-items:center; padding:.25rem 0 .45rem; }
+#panel-mushaf .mushaf-surah-select { flex:1; min-width:0; max-width:23rem; }
+#panel-mushaf #mushafSurah { width:100%; }
+#panel-mushaf .mushaf-more-navigation { position:relative; margin:0; align-self:end; font-size:.78rem; }
+#panel-mushaf .mushaf-more-navigation summary { padding:.62rem .55rem; border:1px solid color-mix(in srgb,currentColor 22%,transparent); border-radius:.4rem; cursor:pointer; }
+#panel-mushaf .mushaf-more-navigation label { margin-top:.4rem; }
+#panel-mushaf .mushaf-font-controls { margin:.25rem 0 .55rem; }
+#panel-mushaf .mushaf-reading { padding:clamp(.65rem,2.5vw,1.2rem); min-height:50dvh; }
+#panel-mushaf .mushaf-reading-header { margin-bottom:.35rem; }
+#panel-mushaf .mushaf-page-mode .mushaf-verses {
+  font-size:var(--mushaf-type-size);
+  line-height:2.4;
+  text-align:justify;
+  text-align-last:center;
+  overflow-wrap:normal;
+  word-break:normal;
+}
+#panel-mushaf .mushaf-basmala { margin:.65rem 0 1rem; }
+#panel-mushaf .mushaf-page-controls { margin-top:1.5rem; }
+#panel-mushaf .mushaf-page-controls button { min-width:0; }
+#panel-mushaf .mushaf-reading-tools { margin-top:.5rem; }
+@media (orientation:landscape) and (max-height:600px){
+  #panel-mushaf .mushaf-reading {padding:.6rem 1.1rem; min-height:65dvh;}
+  #panel-mushaf .mushaf-page-mode .mushaf-verses {line-height:2.15;}
+}
+@media (max-width:420px){
+  #panel-mushaf .mushaf-app-head { gap:.3rem; }
+  #panel-mushaf .mushaf-mode button {padding:.38rem .46rem;}
+  #panel-mushaf .mushaf-reading-header {padding-inline:2.5rem;}
+  #panel-mushaf .mushaf-surah-select {flex-basis:60%;}
+}
+
+#panel-mushaf .mushaf-display-options { margin:0 0 .4rem; font-size:.78rem; }
+#panel-mushaf .mushaf-display-options summary { cursor:pointer; width:max-content; color:color-mix(in srgb,currentColor 74%,transparent); }
+#panel-mushaf .mushaf-source-note { margin:1rem 0 .2rem; opacity:.75; }
+
+/* v0.21.7 — screen-bounded fluid Quran reader: navigation by swiping, not printed pages. */
+#panel-mushaf .mushaf-secondary-hint {font-size:.73rem;opacity:.64;margin:0 0 .35rem;}
+#panel-mushaf .mushaf-reading {
+  box-sizing:border-box; display:flex; flex-direction:column; position:relative;
+  height:min(72dvh,760px); min-height:290px; max-height:none;
+  overflow:hidden; padding:clamp(.55rem,2vw,.95rem);
+  background:Canvas; touch-action:pan-y;
+}
+#panel-mushaf .mushaf-reading-header {
+  flex:0 0 auto; display:grid; grid-template-columns:minmax(2.5rem,auto) minmax(0,1fr) minmax(2.5rem,auto);
+  gap:.3rem; align-items:center; min-height:2.45rem; padding:0; margin:0 0 .35rem;
+}
+#panel-mushaf .mushaf-reading-header h2 {font-size:.98rem;line-height:1.45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+#panel-mushaf .mushaf-index-button,
+#panel-mushaf .mushaf-fullscreen-button {
+  position:static; display:inline-flex; gap:.2rem; align-items:center; justify-content:center;
+  min-height:34px; white-space:nowrap; padding:.28rem .45rem;
+  font-size:.77rem; color:inherit; background:Canvas;
+  border:1px solid color-mix(in srgb,currentColor 22%,transparent);border-radius:.4rem;cursor:pointer;
+}
+#panel-mushaf .mushaf-fullscreen-button {justify-self:end;}
+#panel-mushaf .mushaf-index-button {justify-self:start;}
+#panel-mushaf .mushaf-verses {
+  flex:1 1 auto; display:block; min-width:0; min-height:0; height:100%;
+  padding:.3rem clamp(.2rem,1.5vw,.8rem); overflow:hidden; overscroll-behavior:contain;
+  touch-action:pan-y; user-select:text;
+}
+#panel-mushaf .mushaf-page-mode .mushaf-verses,
+#panel-mushaf .mushaf-text-mode .mushaf-verses {
+  font-family:'Taqss KFGQPC Hafs','Taqss DigitalKhatt','Traditional Arabic',serif;
+  font-size:var(--mushaf-type-size);
+  line-height:2.05; text-align:justify; text-align-last:center;
+  overflow-wrap:normal;word-break:normal;
+}
+#panel-mushaf .mushaf-verses .mushaf-verse {display:inline;line-height:inherit;white-space:pre-wrap;unicode-bidi:normal;}
+#panel-mushaf .mushaf-verses .mushaf-verse.mushaf-fatiha-basmala {
+  display:block;text-align:center;margin:.3rem 0 .65rem;
+}
+#panel-mushaf .mushaf-reading .mushaf-basmala {
+  text-align:center;display:block;margin:.2rem 0 .6rem;font-size:1em;line-height:1.95;
+}
+#panel-mushaf .mushaf-reading-footer {
+  flex:0 0 auto; display:flex;align-items:center;justify-content:space-between;gap:.3rem;
+  padding:.35rem .1rem 0; margin:.15rem 0 0;
+  border-top:1px solid color-mix(in srgb,currentColor 12%,transparent);
+  font:.72rem/1.4 system-ui,sans-serif;opacity:.65;
+}
+#panel-mushaf .mushaf-status {flex:0 0 auto;}
+#panel-mushaf .mushaf-status[hidden] {display:none;}
+#panel-mushaf .mushaf-index-overlay[hidden] {display:none !important;}
+#panel-mushaf .mushaf-index-overlay {
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.48);z-index:100000;padding:1rem;direction:rtl;
+}
+#panel-mushaf .mushaf-index-dialog {
+  width:min(100%,380px);max-height:calc(100dvh - 2rem);overflow-y:auto;
+  padding:1rem;border-radius:.7rem; background:Canvas;color:CanvasText;
+  box-shadow:0 10px 30px rgba(0,0,0,.18);font-family:system-ui,sans-serif;
+}
+#panel-mushaf .mushaf-index-head {display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem;}
+#panel-mushaf .mushaf-index-head button {border:0;background:transparent;color:inherit;font-size:1.1rem;cursor:pointer;}
+#panel-mushaf #mushafJumpForm {display:grid;gap:.5rem;}
+#panel-mushaf #mushafJumpForm label {font-size:.86rem;font-weight:650;}
+#panel-mushaf #mushafJumpForm select {width:100%;height:42px;font:inherit;padding:.4rem;color:inherit;background:Canvas;border:1px solid color-mix(in srgb,currentColor 27%,transparent);border-radius:.4rem;}
+#panel-mushaf .mushaf-index-extra {font-size:.82rem;margin:.4rem 0;}
+#panel-mushaf .mushaf-index-extra summary {cursor:pointer;}
+#panel-mushaf .mushaf-index-actions {display:flex;justify-content:flex-end;gap:.6rem;margin-top:.4rem;}
+#panel-mushaf .mushaf-index-actions button {min-width:5.5rem;padding:.6rem;border-radius:.42rem;background:Canvas;color:inherit;border:1px solid color-mix(in srgb,currentColor 27%,transparent);font:inherit;cursor:pointer;}
+#panel-mushaf .mushaf-index-actions .mushaf-index-go {background:#177c50;border-color:#177c50;color:#fff;font-weight:750;}
+#panel-mushaf .mushaf-reading:is(:fullscreen,.is-mushaf-fullscreen) {
+  display:flex;flex-direction:column;height:100dvh;min-height:0;max-height:100dvh;
+  overflow:hidden;box-sizing:border-box;
+}
+#panel-mushaf .mushaf-reading:is(:fullscreen,.is-mushaf-fullscreen) .mushaf-reading-header {position:static;background:Canvas;padding:0;}
+#panel-mushaf .mushaf-reading:is(:fullscreen,.is-mushaf-fullscreen) .mushaf-verses {width:100%;max-width:850px;flex:1 1 auto;overflow:hidden;}
+@media(max-height:550px) and (orientation:landscape){
+  #panel-mushaf .mushaf-reading {height:70dvh;min-height:215px;}
+  #panel-mushaf .mushaf-page-mode .mushaf-verses,
+  #panel-mushaf .mushaf-text-mode .mushaf-verses {line-height:1.85;}
+  #panel-mushaf .mushaf-secondary-hint {display:none;}
+}
+@media(max-width:410px){
+  #panel-mushaf .mushaf-reading-header {gap:.12rem;}
+  #panel-mushaf .mushaf-index-button span,
+  #panel-mushaf .mushaf-fullscreen-button span {display:none;}
+  #panel-mushaf .mushaf-swipe-tip {font-size:.68rem;}
+}
+/* Separators are purely visual: original official Unicode verse strings remain untouched. */
+#panel-mushaf .mushaf-verses .mushaf-verse::after {content:'\00a0';white-space:pre;}
+#panel-mushaf .mushaf-verses .mushaf-verse.mushaf-fatiha-basmala::after {content:none;}
+
+/* v0.21.8: Never separate the official verse-ending numeral from its final word. */
+#panel-mushaf .mushaf-verse-ending { white-space: nowrap !important; display: inline-block; }
+
+/* v0.21.9 — one compact reader; slim separate navigation bar and distinct text frame. */
+#panel-mushaf .mushaf-reading {
+  border:0!important;border-radius:0!important;background:transparent!important;
+  padding:.05rem 0 0!important;height:min(77dvh,820px);
+  min-height:285px;
+}
+#panel-mushaf .mushaf-reading-header {
+  position:relative;z-index:2;flex:0 0 auto;
+  min-height:42px;height:42px;padding:.15rem .4rem!important;margin:0 0 .32rem;
+  border:1.5px solid #6f9d85;border-radius:.55rem;
+  background:color-mix(in srgb,#e3f1e9 23%,Canvas);
+  grid-template-columns:42px minmax(0,1fr) 42px;
+}
+#panel-mushaf .mushaf-reading-header h2 {
+  color:#22744c;font-size:1rem;font-weight:800;line-height:1.25;
+}
+#panel-mushaf .mushaf-index-button,#panel-mushaf .mushaf-fullscreen-button {
+  padding:0;width:34px;height:34px;min-height:34px;font-size:1.1rem;
+  border-color:color-mix(in srgb,#54866c 33%,transparent);
+}
+#panel-mushaf .mushaf-reading-header button span {display:none;}
+#panel-mushaf .mushaf-verses {
+  border:2px solid #6f9d85;border-radius:.6rem;background:Canvas;
+  padding:.35rem clamp(.35rem,1.6vw,.85rem);box-sizing:border-box;
+}
+#panel-mushaf .mushaf-reading-footer {
+  margin:.2rem 0 0;padding:.14rem .2rem 0;border-top:0;
+}
+#panel-mushaf .mushaf-short-surah {text-align:center;text-align-last:center;}
+#panel-mushaf .mushaf-mode {margin:.4rem 0 0;flex-wrap:wrap;}
+#panel-mushaf .mushaf-mode legend {font-size:.85rem;font-weight:700;}
+#panel-mushaf .mushaf-mode button {min-width:38%;}
+#panel-mushaf .mushaf-listening {margin:.15rem 0 .35rem;padding:.3rem .5rem;font-size:.75rem;}
+#panel-mushaf .mushaf-reading:is(:fullscreen,.is-mushaf-fullscreen){
+  height:100dvh!important;min-height:0;max-height:100dvh;padding:max(.3rem,env(safe-area-inset-top)) .5rem max(.3rem,env(safe-area-inset-bottom))!important;
+}
+#panel-mushaf .mushaf-reading:is(:fullscreen,.is-mushaf-fullscreen) .mushaf-reading-header{width:100%;max-width:900px;align-self:center;}
+#panel-mushaf .mushaf-reading:is(:fullscreen,.is-mushaf-fullscreen) .mushaf-verses{max-width:900px;}
+@media(max-height:550px) and (orientation:landscape){
+ #panel-mushaf .mushaf-reading {height:71dvh;min-height:190px;}
+}
+
+/* v0.22.1 — automatically responsive Quran typography; no user font-size setting.
+   Small screens preserve predictable reading density, while tablets and TVs
+   gain appropriately sized text. Layout's ResizeObserver remeasures segments. */
+#panel-mushaf { --mushaf-type-size:30px; }
+@media (orientation:landscape) {
+  #panel-mushaf { --mushaf-type-size:34px; }
+}
+/* Tablet-sized displays, also applicable to larger portrait screens. */
+@media (min-width:700px) and (min-height:600px) {
+  #panel-mushaf { --mushaf-type-size:clamp(34px, calc(26px + 1.1vw), 43px); }
+}
+/* Desktop and TV: scale up without creating oversized text. */
+@media (min-width:1200px) and (min-height:650px) {
+  #panel-mushaf { --mushaf-type-size:clamp(43px, calc(25px + 1.4vw), 62px); }
+}
+#panel-mushaf .mushaf-page-mode .mushaf-verses,
+#panel-mushaf .mushaf-text-mode .mushaf-verses { font-size:var(--mushaf-type-size); }
+
+/* v0.22.2: no reader footer or external bookmark controls; keep reading chrome compact. */
+#panel-mushaf .mushaf-index-bookmarks {
+  margin-top:.85rem;padding-top:.75rem;border-top:1px solid color-mix(in srgb,#6f9d85 43%,transparent);
+  display:grid;gap:.45rem;
+}
+#panel-mushaf .mushaf-index-bookmark-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem;}
+#panel-mushaf .mushaf-index-bookmark-actions button {
+  font:inherit;font-size:.85rem;line-height:1.35;min-height:42px;padding:.45rem .2rem;
+  border:1px solid #83a997;border-radius:.45rem;background:Canvas;color:inherit;cursor:pointer;
+}
+#panel-mushaf .mushaf-index-bookmark-actions button:disabled {opacity:.45;cursor:not-allowed;}
+#panel-mushaf .mushaf-index-bookmarks #mushafPosition {margin:0;font-size:.73rem;opacity:.7;}
+#panel-mushaf #mushafActionStatus {font:.78rem/1.6 system-ui,sans-serif;color:#22744c;margin:0;}
+#panel-mushaf #mushafActionStatus[hidden] {display:none;}
+
+
+/* v0.22.3 — compact landscape-friendly index; three controls in one row. */
+#panel-mushaf .mushaf-index-dialog {
+  width:min(96vw,610px);
+  padding:clamp(.6rem,1.8vw,.85rem);
+  border:1px solid #a5c5b3;
+}
+#panel-mushaf .mushaf-index-head {margin-bottom:.5rem;}
+#panel-mushaf .mushaf-index-fields {
+  display:grid;
+  grid-template-columns:minmax(0,1.65fr) minmax(0,.62fr) minmax(0,.82fr);
+  gap:.5rem;
+  align-items:end;
+}
+#panel-mushaf .mushaf-index-field {display:grid;min-width:0;gap:.22rem;}
+#panel-mushaf .mushaf-index-field label {font-size:.79rem;font-weight:700;}
+#panel-mushaf .mushaf-index-field select {
+  width:100%;min-width:0;height:36px;padding:.23rem .33rem;
+  font-size:.89rem;text-overflow:ellipsis;
+}
+#panel-mushaf .mushaf-index-actions {margin-top:.62rem;gap:.4rem;}
+#panel-mushaf .mushaf-index-actions button {
+  min-width:0;min-height:34px;padding:.26rem .85rem;font-size:.83rem;
+}
+#panel-mushaf .mushaf-index-bookmarks {
+  margin-top:.5rem;padding-top:.5rem;gap:.3rem;
+}
+#panel-mushaf .mushaf-index-bookmark-actions {display:flex;gap:.4rem;flex-wrap:wrap;}
+#panel-mushaf .mushaf-index-bookmark-actions button {
+  min-height:34px;padding:.3rem .65rem;font-size:.8rem;flex:0 1 auto;
+}
+@media (max-width:365px) {
+  #panel-mushaf .mushaf-index-fields {grid-template-columns:minmax(0,1.4fr) minmax(0,.52fr) minmax(0,.8fr);gap:.3rem;}
+  #panel-mushaf .mushaf-index-field select {font-size:.8rem;padding-inline:.1rem;}
+  #panel-mushaf .mushaf-index-bookmark-actions button {flex:1;}
+}
+@media (max-height:420px) and (orientation:landscape) {
+  #panel-mushaf .mushaf-index-overlay {align-items:center;padding:.35rem;}
+  #panel-mushaf .mushaf-index-dialog {max-height:calc(100dvh - .7rem);}
+  #panel-mushaf .mushaf-index-head {margin-bottom:.25rem;}
+  #panel-mushaf .mushaf-index-bookmarks {margin-top:.32rem;padding-top:.32rem;}
+}
+
+/* v0.22.4: Fatiha audio and TV navigation. Keep the chosen reader layout. */
+#panel-mushaf .mushaf-listening[hidden] {display:none!important;}
+#panel-mushaf .mushaf-listening {
+  flex:0 0 auto;box-sizing:border-box; margin:.3rem 0 0;padding:.28rem .4rem;
+  border:1px solid color-mix(in srgb,#6f9d85 60%,Canvas);border-radius:.5rem;
+  background:Canvas;font: .75rem/1.4 system-ui,sans-serif;
+}
+#panel-mushaf .mushaf-audio-controls {display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.3rem;}
+#panel-mushaf .mushaf-audio-controls button {
+  border:1px solid color-mix(in srgb,#6f9d85 64%,Canvas);border-radius:.4rem;
+  background:Canvas;color:inherit;cursor:pointer;min-width:32px;min-height:32px;
+  font:700 .82rem system-ui,sans-serif;padding:.2rem .42rem;
+}
+#panel-mushaf .mushaf-audio-controls button:disabled {opacity:.35;cursor:default;}
+#panel-mushaf #mushafAudioPlay {color:#22744c;min-width:77px;}
+#panel-mushaf .mushaf-audio-verse {font-weight:700;white-space:nowrap;}
+#panel-mushaf .mushaf-audio-time {font: .77rem system-ui,sans-serif;white-space:nowrap;}
+#panel-mushaf .mushaf-audio-message {font: .7rem/1.4 system-ui,sans-serif;opacity:.78;text-align:center;margin:.15rem 0 0;}
+/* Repeated CSS above intentionally avoided setting a background on the current verse. */
+#panel-mushaf .mushaf-verses .mushaf-verse.is-playing,
+#panel-mushaf .mushaf-verses .mushaf-verse.mushaf-fatiha-basmala.is-playing {
+  color:#148251!important;background:transparent!important;
+}
+#panel-mushaf .mushaf-tv-navigation {display:none;}
+@media(min-width:850px) {
+  #panel-mushaf .mushaf-tv-navigation {display:flex;position:absolute;z-index:1;top:49%;left:2px;right:2px;justify-content:space-between;pointer-events:none;}
+  #panel-mushaf .mushaf-tv-navigation button {pointer-events:auto;border:1px solid #6f9d85;border-radius:50%;background:Canvas;color:#22744c;opacity:.85;font-size:1.5rem;width:38px;height:38px;cursor:pointer;}
+}
+@media(max-height:530px) and (orientation:landscape) {
+  #panel-mushaf .mushaf-listening {padding:.1rem .25rem;margin-top:.12rem;}
+  #panel-mushaf .mushaf-audio-message {display:none;}
+}
+
+/* v0.22.5 experimental adaptive audio controls: visible ONLY in listening mode. */
+#panel-mushaf .mushaf-audio-controls select {max-width:min(36vw,185px);min-width:100px;min-height:32px;border:1px solid #8aa995;border-radius:.4rem;padding:.15rem;background:Canvas;color:inherit;font:.78rem system-ui,sans-serif;}
+#panel-mushaf .mushaf-reciter-label {font-weight:600;white-space:nowrap;}
+#panel-mushaf #mushafRepeatAyah[aria-pressed="true"] {background:#22744c;color:white;border-color:#22744c;}
+#panel-mushaf .mushaf-listening {position:relative;z-index:2;}
+@media(max-width:380px){#panel-mushaf .mushaf-audio-controls{gap:.18rem;}#panel-mushaf .mushaf-audio-controls select{max-width:135px;}}
+
+
+/* v0.22.6 — one-row listening controls for small phones, landscape and TV. */
+#panel-mushaf .mushaf-audio-controls {
+  display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;
+  width:100%;max-width:100%;min-width:0;gap:clamp(3px,1vw,9px);
+}
+#panel-mushaf .mushaf-audio-controls button {
+  flex:0 0 auto;box-sizing:border-box;min-width:34px;min-height:38px;
+  padding:0 4px;line-height:1.15;font-size:1.05rem;
+}
+#panel-mushaf .mushaf-audio-controls .mushaf-play-btn {min-width:39px;width:39px;color:#22744c;font-size:1.08rem;}
+#panel-mushaf .mushaf-audio-controls .mushaf-repeat-btn {min-width:39px;font-size:.91rem;font-weight:750;white-space:nowrap;}
+#panel-mushaf .mushaf-reciter-wrap {
+  flex:1 1 125px;min-width:0;max-width:225px;box-sizing:border-box;
+  display:flex;align-items:center;gap:3px;border:1px solid #8aa995;
+  border-radius:.4rem;padding:0 4px;min-height:38px;background:Canvas;
+}
+#panel-mushaf .mushaf-reciter-icon {flex:none;direction:ltr;color:#22744c;font:bold 14px system-ui,sans-serif;letter-spacing:-2px;}
+#panel-mushaf .mushaf-audio-controls .mushaf-reciter-wrap select {
+  flex:1 1 auto;width:100%;min-width:0;max-width:none;min-height:35px;
+  padding:0 1px;border:0;outline-offset:-2px;background:transparent;
+  font:.78rem system-ui,sans-serif;text-overflow:ellipsis;
+}
+#panel-mushaf .mushaf-listening {width:100%;box-sizing:border-box;position:relative;z-index:2;margin-top:.18rem;padding:.28rem .35rem;}
+#panel-mushaf .mushaf-audio-message[hidden] {display:none!important;}
+#panel-mushaf .mushaf-audio-message:not([hidden]) {display:block;margin:.25rem 0 0;line-height:1.5;opacity:1;color:#936c18;}
+@media(max-width:380px){
+  #panel-mushaf .mushaf-audio-controls{gap:3px;}
+  #panel-mushaf .mushaf-audio-controls button{min-width:31px;min-height:35px;padding:0 2px;}
+  #panel-mushaf .mushaf-audio-controls .mushaf-play-btn{width:35px;min-width:35px;}
+  #panel-mushaf .mushaf-audio-controls .mushaf-repeat-btn{min-width:35px;}
+  #panel-mushaf .mushaf-reciter-wrap{min-height:35px;padding:0 2px;}
+  #panel-mushaf .mushaf-audio-controls .mushaf-reciter-wrap select{font-size:.71rem;min-height:32px;}
+}
+@media(orientation:landscape) and (min-width:600px){
+ #panel-mushaf .mushaf-audio-controls{gap:.6rem;}
+ #panel-mushaf .mushaf-reciter-wrap{max-width:240px;}
+}
+
+
+/* v0.22.7 — Touch devices use swipes, not the page-side TV/desktop arrows.
+   A real touch event also enables this class on hybrid devices. */
+#panel-mushaf .mushaf-tv-navigation {display:none;}
+@media (min-width:850px) {
+  html:not(.mushaf-has-touch) #panel-mushaf .mushaf-tv-navigation {display:flex;}
+}
+html.mushaf-has-touch #panel-mushaf .mushaf-tv-navigation {display:none!important;}
+
+/* Arabic reading order: reciter at the right, then next/play/previous, repeat at left. */
+#panel-mushaf .mushaf-audio-controls {direction:rtl;}
+#panel-mushaf .mushaf-audio-controls .mushaf-reciter-wrap {order:0; direction:rtl;}
+#panel-mushaf .mushaf-audio-controls #mushafAudioNext {order:1;}
+#panel-mushaf .mushaf-audio-controls #mushafAudioPlay {order:2;}
+#panel-mushaf .mushaf-audio-controls #mushafAudioPrev {order:3;}
+#panel-mushaf .mushaf-audio-controls #mushafRepeatAyah {order:4;}
+#panel-mushaf .mushaf-audio-controls .mushaf-reciter-wrap select {direction:rtl;text-align:right;}
+#panel-mushaf .mushaf-audio-controls .mushaf-reciter-icon {letter-spacing:0;}
+
+/* v0.22.8: balanced Quran frame spacing. JS measures with identical rules
+   on the visible and hidden copies to avoid clipping the final line. */
+#panel-mushaf .mushaf-verses {
+  padding-block:.65rem .82rem;
+}
+#panel-mushaf .mushaf-reading:is(:fullscreen,.is-mushaf-fullscreen) .mushaf-verses {
+  padding-block:.7rem .9rem;
+}

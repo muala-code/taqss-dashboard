@@ -1,0 +1,64 @@
+    <section id="panel-mushaf" class="panel" hidden aria-label="تبويب المصحف">
+
+      <div id="mushafReading" class="mushaf-reading mushaf-page-mode" lang="ar" dir="rtl">
+        <div class="mushaf-reading-header">
+          <button id="mushafIndexButton" class="mushaf-index-button" type="button" aria-label="فتح فهرس السور والآيات" aria-haspopup="dialog" aria-expanded="false" title="الفهرس">☷ <span>الفهرس</span></button>
+          <h2 id="mushafReadingTitle">سورة الفاتحة</h2>
+          <button id="mushafFullscreenButton" class="mushaf-fullscreen-button" type="button" aria-label="ملء شاشة القراءة" aria-pressed="false" title="ملء الشاشة">⛶ <span>ملء الشاشة</span></button>
+        </div>
+        <p id="mushafLoadStatus" class="mushaf-status" role="status">جارٍ تحميل بيانات المصحف…</p>
+        <div id="mushafVerses" class="mushaf-verses" role="region" aria-label="مساحة القراءة: اسحب يميناً للتقدم ويساراً للرجوع" tabindex="0"></div>
+        <div class="mushaf-tv-navigation" aria-label="التنقل في المصحف">
+          <button id="mushafNavPrev" type="button" aria-label="المقطع السابق" title="السابق">‹</button>
+          <button id="mushafNavNext" type="button" aria-label="المقطع التالي" title="التالي">›</button>
+        </div>
+        <div id="mushafListening" class="mushaf-listening" hidden role="group" aria-label="الاستماع إلى القرآن الكريم">
+          <audio id="mushafAudio" preload="none"></audio>
+          <div class="mushaf-audio-controls">
+            <button id="mushafRepeatAyah" class="mushaf-repeat-btn" type="button" aria-label="تفعيل تكرار الآية مرتين" aria-pressed="false" title="تكرار الآية: إيقاف">↻</button>
+            <button id="mushafAudioPrev" type="button" aria-label="الآية السابقة" title="الآية السابقة">❮</button>
+            <button id="mushafAudioPlay" class="mushaf-play-btn" type="button" aria-label="تشغيل التلاوة" aria-pressed="false">▶</button>
+            <button id="mushafAudioNext" type="button" aria-label="الآية التالية" title="الآية التالية">❯</button>
+            <label class="mushaf-reciter-wrap" for="mushafReciter" title="اختيار القارئ"><span class="mushaf-reciter-icon" aria-hidden="true">◖))</span><select id="mushafReciter" aria-label="اختيار القارئ"></select></label>
+          </div>
+          <p id="mushafAudioMessage" class="mushaf-audio-message" role="status" aria-live="polite" hidden></p>
+        </div>
+      <div id="mushafIndexOverlay" class="mushaf-index-overlay" hidden>
+        <section id="mushafIndexDialog" class="mushaf-index-dialog" role="dialog" aria-modal="true" aria-labelledby="mushafIndexTitle" tabindex="-1">
+          <div class="mushaf-index-head"><strong id="mushafIndexTitle">فهرس المصحف</strong><button id="mushafIndexClose" type="button" aria-label="إغلاق الفهرس">✕</button></div>
+          <form id="mushafJumpForm">
+            <div class="mushaf-index-fields">
+              <div class="mushaf-index-field mushaf-field-surah">
+                <label for="mushafSurah">السورة</label>
+                <select id="mushafSurah" aria-label="اختيار السورة"></select>
+              </div>
+              <div class="mushaf-index-field mushaf-field-ayah">
+                <label for="mushafAyah">الآية</label>
+                <select id="mushafAyah" aria-label="اختيار الآية"></select>
+              </div>
+              <div class="mushaf-index-field mushaf-field-mode">
+                <label for="mushafDisplayMode">العرض</label>
+                <select id="mushafDisplayMode" aria-label="طريقة العرض">
+                  <option value="read">قراءة</option>
+                  <option value="listen">استماع</option>
+                </select>
+              </div>
+            </div>
+            <div class="mushaf-index-actions">
+              <button id="mushafIndexGo" class="mushaf-index-go" type="submit">انتقال</button>
+              <button id="mushafIndexCancel" type="button">إلغاء</button>
+            </div>
+          </form>
+          <div class="mushaf-index-bookmarks" role="group" aria-label="موضع القراءة">
+            <div class="mushaf-index-bookmark-actions">
+              <button id="mushafSavePlace" type="button" disabled>حفظ الموضع</button>
+              <button id="mushafResume" type="button" disabled>متابعة القراءة</button>
+            </div>
+            <span id="mushafPosition" aria-live="polite">الموضع: —</span>
+            <p id="mushafActionStatus" role="status" aria-live="polite" hidden></p>
+          </div>
+        </section>
+      </div>
+      </div>
+
+    </section>

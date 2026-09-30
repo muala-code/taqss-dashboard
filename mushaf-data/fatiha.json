@@ -1,0 +1,58 @@
+{
+  "riwaya": "hafs",
+  "counts": "Kufi",
+  "source": "quranpedia.mushaf#1",
+  "scope": "surah 1 (test only)",
+  "verification": "source-declared; not independently verified against official print",
+  "ayat": [
+    {
+      "surah": 1,
+      "ayah": 1,
+      "text": "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+      "page": 1,
+      "juz": 1
+    },
+    {
+      "surah": 1,
+      "ayah": 2,
+      "text": "الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ",
+      "page": 1,
+      "juz": 1
+    },
+    {
+      "surah": 1,
+      "ayah": 3,
+      "text": "الرَّحْمَٰنِ الرَّحِيمِ",
+      "page": 1,
+      "juz": 1
+    },
+    {
+      "surah": 1,
+      "ayah": 4,
+      "text": "مَالِكِ يَوْمِ الدِّينِ",
+      "page": 1,
+      "juz": 1
+    },
+    {
+      "surah": 1,
+      "ayah": 5,
+      "text": "إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ",
+      "page": 1,
+      "juz": 1
+    },
+    {
+      "surah": 1,
+      "ayah": 6,
+      "text": "اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ",
+      "page": 1,
+      "juz": 1
+    },
+    {
+      "surah": 1,
+      "ayah": 7,
+      "text": "صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ",
+      "page": 1,
+      "juz": 1
+    }
+  ]
+}
