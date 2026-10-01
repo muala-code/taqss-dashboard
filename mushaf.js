@@ -1,4 +1,4 @@
-/* Taqss Mushaf v0.23.4 — surah-bounded screen segments + selectable reader font, official KFGQPC Hafs v3.0.
+/* Taqss Mushaf v0.23.6 — surah-bounded screen segments + selectable reader font, official KFGQPC Hafs v3.0.
    Verse text is copied unchanged from the official source. Visual chunks never change it. */
 (() => {
   'use strict';
@@ -326,17 +326,64 @@
     state.audioSurah=cursor.surah;state.audioAyah=cursor.ayah;
     syncAudioUI();setStatus('');render();
   }
+  // Native selects retain the data model; visible buttons avoid device pickers.
+  const pickers=[];
+  function setupMushafPickers(){
+    document.querySelectorAll('#panel-mushaf select').forEach(select=>{
+      const wrap=document.createElement('div');wrap.className='mushaf-picker';
+      select.before(wrap);wrap.append(select);select.hidden=true;
+      const button=document.createElement('button');button.type='button';button.className='mushaf-picker-button';
+      button.id=select.id+'Button';
+      document.querySelectorAll('label[for="'+select.id+'"]').forEach(label=>label.htmlFor=button.id);
+      button.setAttribute('aria-label',select.getAttribute('aria-label')||'اختيار');
+      button.setAttribute('aria-haspopup','listbox');button.setAttribute('aria-expanded','false');
+      const menu=document.createElement('div');menu.id=select.id+'Menu';menu.className='mushaf-picker-menu';
+      menu.setAttribute('role','listbox');menu.setAttribute('aria-label',button.getAttribute('aria-label'));menu.hidden=true;
+      button.setAttribute('aria-controls',menu.id);wrap.append(button,menu);
+      const close=()=>{menu.hidden=true;button.setAttribute('aria-expanded','false');};
+      const sync=()=>{button.textContent=(select.selectedOptions[0]?.textContent||'—')+' ▾';};
+      const open=()=>{
+        pickers.forEach(p=>p.close());menu.replaceChildren();
+        Array.from(select.options).forEach(option=>{
+          const item=document.createElement('button');item.type='button';item.textContent=option.textContent;
+          item.setAttribute('role','option');item.setAttribute('aria-selected',String(option.selected));item.disabled=option.disabled;
+          item.addEventListener('click',()=>{select.value=option.value;select.dispatchEvent(new Event('change',{bubbles:true}));sync();close();button.focus();});menu.append(item);
+        });
+        menu.hidden=false;button.setAttribute('aria-expanded','true');
+        (menu.querySelector('[aria-selected="true"]')||menu.firstElementChild)?.focus();
+      };
+      button.addEventListener('click',()=>menu.hidden?open():close());
+      wrap.addEventListener('keydown',event=>{
+        if(event.key==='Escape'&&!menu.hidden){event.preventDefault();event.stopPropagation();close();button.focus();}
+        if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){
+          event.preventDefault();event.stopPropagation();
+          if(menu.hidden){open();return;}
+          const items=Array.from(menu.querySelectorAll('button:not([disabled])'));let at=items.indexOf(document.activeElement);
+          at=event.key==='Home'?0:event.key==='End'?items.length-1:(at+(event.key==='ArrowDown'?1:-1)+items.length)%items.length;
+          items[at]?.focus();
+        }
+      });
+      document.addEventListener('click',event=>{if(!wrap.contains(event.target))close();});
+      select.addEventListener('change',sync);new MutationObserver(sync).observe(select,{childList:true,subtree:true});
+      pickers.push({sync,close});sync();
+    });
+  }
+  function syncPickers(){pickers.forEach(p=>{p.close();p.sync();});}
   function openIndex(){
     const overlay=$('#mushafIndexOverlay');if(!state.ready)return;
     const focusFrom=document.activeElement;state.returnFocus=focusFrom;
     $('#mushafSurah').value=String(state.cursor.surah);
     refreshAyahOptions(state.cursor.surah,state.cursor.ayah);
+    $('#mushafDisplayMode').value=state.mode;
+    $('#mushafFontChoice').value=state.font;
+    syncPickers();
     $('#mushafActionStatus').hidden=true;
     overlay.hidden=false;state.modalOpen=true;
     $('#mushafIndexButton').setAttribute('aria-expanded','true');
     $('#mushafIndexDialog').focus();
   }
   function closeIndex(){
+    syncPickers();
     $('#mushafIndexOverlay').hidden=true;state.modalOpen=false;
     $('#mushafIndexButton').setAttribute('aria-expanded','false');
     (state.returnFocus||$('#mushafIndexButton')).focus();
@@ -674,11 +721,11 @@
     state.lastSave=last;
     // Hide side arrows on phones/tablets, including in landscape. On hybrids,
     // the first genuine touch also hides them; desktops/TVs retain buttons.
-    if (navigator.maxTouchPoints > 0) document.documentElement.classList.add('mushaf-has-touch');
+    // A capability flag alone can misidentify a TV: hide only after real touch.
     document.addEventListener('touchstart', () => {
       document.documentElement.classList.add('mushaf-has-touch');
     }, {once:true, passive:true});
-    setupFullscreen();setupSwipe();setupAudio();
+    setupFullscreen();setupSwipe();setupAudio();setupMushafPickers();
     $('#mushafNavPrev').addEventListener('click',()=>move('prev'));
     $('#mushafNavNext').addEventListener('click',()=>move('next'));
     document.addEventListener('keydown',event=>{
@@ -688,8 +735,7 @@
       if(element?.matches?.('select,input,textarea,[contenteditable="true"]'))return;
       event.preventDefault();move(event.key==='ArrowRight'?'next':'prev');
     });
-    $('#mushafDisplayMode').addEventListener('change',event=>setMode(event.target.value));
-    $('#mushafFontChoice')?.addEventListener('change',event=>applyFont(event.target.value));
+    // Index choices are drafts until the form is submitted.
     $('#mushafIndexButton').addEventListener('click',openIndex);
     $('#mushafIndexClose').addEventListener('click',closeIndex);
     $('#mushafIndexCancel').addEventListener('click',closeIndex);
@@ -709,7 +755,9 @@
       event.preventDefault();
       const s=Number($('#mushafSurah').value),a=Number($('#mushafAyah').value);
       if(!state.surahs.get(s)?.[a-1])return;
-      closeIndex();goTo(s,a);
+      const mode=$('#mushafDisplayMode').value,font=$('#mushafFontChoice').value;
+      stopAudio();applyFont(font);setMode(mode);
+      closeIndex();goTo(s,a);saveSettings();
     });
     $('#mushafSavePlace').addEventListener('click',()=>{
       const place=state.selected||state.cursor;
@@ -724,7 +772,7 @@
     state.reciter=byId(settings.reciter).id;$('#mushafReciter').value=state.reciter;
     state.repeat=([0,2,3,5].includes(Number(settings.repeat))?Number(settings.repeat):(settings.repeat?2:0));state.repeatPlayed=0;
     applyFont(settings.font || 'majma', false);
-    setMode(settings.mode);
+    setMode(settings.mode);syncPickers();
     // The tab initially loads hidden. Observe its visibility and size before measuring line layout.
     const panel=$('#panel-mushaf');
     new MutationObserver(()=>{if(!panel.hidden)scheduleRender();}).observe(panel,{attributes:true,attributeFilter:['hidden']});
