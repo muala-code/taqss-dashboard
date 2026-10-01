@@ -18,4 +18,10 @@ window.TAQSS_MARKETS = [
   { symbol: "4190.SR", name: "جرير", category: "stock", enabled: true },
   { symbol: "4003.SR", name: "إكسترا", category: "stock", enabled: true },
   { symbol: "2300.SR", name: "صناعة الورق", category: "stock", enabled: true },
+  { symbol: "2280.SR", name: "المراعي", category: "stock", enabled: true },
+  { symbol: "7020.SR", name: "موبايلي", category: "stock", enabled: true },
+  { symbol: "1150.SR", name: "الإنماء", category: "stock", enabled: true },
+  { symbol: "1140.SR", name: "البلاد", category: "stock", enabled: true },
+  { symbol: "4100.SR", name: "مكة", category: "stock", enabled: true },
+  { symbol: "4090.SR", name: "طيبة", category: "stock", enabled: true },
 ];

@@ -1,0 +1,7 @@
+v0.23.2 Mushaf refinement
+- Keeps the bounded/swipe reader for performance.
+- Allows a following surah heading + basmala to appear in the same bounded text area when space permits.
+- Surah 9 remains without basmala.
+- Adds camera-safe header information: juz on the right, surah on the left, reserved blank center.
+- Expands portrait reading area using available dynamic viewport height.
+- Modestly reduces Quran text size/line-height on shorter portrait phones.

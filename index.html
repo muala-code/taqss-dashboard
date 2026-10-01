@@ -7,8 +7,8 @@
   <title>طقس داشبورد</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌡️</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=0.20.9-test">
-  <link rel="stylesheet" href="mushaf.css?v=0.22.8">
+  <link rel="stylesheet" href="styles.css?v=0.21.0">
+  <link rel="stylesheet" href="mushaf.css?v=0.23.4">
 </head>
 <body>
   <nav class="tabs" aria-label="التبويبات الرئيسية">
@@ -118,11 +118,15 @@
       <div id="mushafReading" class="mushaf-reading mushaf-page-mode" lang="ar" dir="rtl">
         <div class="mushaf-reading-header">
           <button id="mushafIndexButton" class="mushaf-index-button" type="button" aria-label="فتح فهرس السور والآيات" aria-haspopup="dialog" aria-expanded="false" title="الفهرس">☷ <span>الفهرس</span></button>
-          <h2 id="mushafReadingTitle">سورة الفاتحة</h2>
+          <div id="mushafHeaderJuz" class="mushaf-header-info mushaf-header-juz" aria-live="polite">الجزء —</div>
+          <span class="mushaf-camera-gap" aria-hidden="true"></span>
+          <div id="mushafHeaderSurah" class="mushaf-header-info mushaf-header-surah" aria-live="polite">سورة —</div>
           <button id="mushafFullscreenButton" class="mushaf-fullscreen-button" type="button" aria-label="ملء شاشة القراءة" aria-pressed="false" title="ملء الشاشة">⛶ <span>ملء الشاشة</span></button>
+          <h2 id="mushafReadingTitle" class="mushaf-reading-title-placeholder" aria-hidden="true"></h2>
         </div>
         <p id="mushafLoadStatus" class="mushaf-status" role="status">جارٍ تحميل بيانات المصحف…</p>
         <div id="mushafVerses" class="mushaf-verses" role="region" aria-label="مساحة القراءة: اسحب يميناً للتقدم ويساراً للرجوع" tabindex="0"></div>
+        <div id="mushafPageInfo" class="mushaf-page-info" aria-live="polite">الجزء — · سورة —</div>
         <div class="mushaf-tv-navigation" aria-label="التنقل في المصحف">
           <button id="mushafNavPrev" type="button" aria-label="المقطع السابق" title="السابق">‹</button>
           <button id="mushafNavNext" type="button" aria-label="المقطع التالي" title="التالي">›</button>
@@ -158,6 +162,14 @@
                   <option value="listen">استماع</option>
                 </select>
               </div>
+              <div class="mushaf-index-field mushaf-field-font">
+                <label for="mushafFontChoice">الخط</label>
+                <select id="mushafFontChoice" aria-label="اختيار خط المصحف">
+                  <option value="majma">خط المجمع</option>
+                  <option value="uthmani">الخط العثماني</option>
+                  <option value="arabic">خط عربي عادي</option>
+                </select>
+              </div>
             </div>
             <div class="mushaf-index-actions">
               <button id="mushafIndexGo" class="mushaf-index-go" type="submit">انتقال</button>
@@ -183,9 +195,9 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="config.js?v=0.20.1"></script>
-  <script src="markets-config.js?v=0.20.1"></script>
-  <script src="app.js?v=0.20.9-test"></script>
+  <script src="markets-config.js?v=0.23.5"></script>
+  <script src="app.js?v=0.21.0"></script>
   <script src="radar.js?v=0.20.1"></script>
-  <script src="mushaf.js?v=0.22.8"></script>
+  <script src="mushaf.js?v=0.23.4"></script>
 </body>
 </html>

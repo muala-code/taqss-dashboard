@@ -648,11 +648,11 @@
   function buildIndexTicker(indices, bySymbol) {
     const area = document.createElement("section");
     area.className = "index-ticker";
-    area.setAttribute("aria-label", "المؤشرات");
+    area.setAttribute("aria-label", "المؤشرات والسلع والمعادن");
     const viewport = document.createElement("div");
     viewport.className = "index-ticker-viewport";
     viewport.tabIndex = 0;
-    viewport.setAttribute("aria-label", "مؤشرات السوق، شريط متحرك يتوقف عند تمرير المؤشر أو التركيز عليه");
+    viewport.setAttribute("aria-label", "المؤشرات والسلع والمعادن، شريط متحرك يتوقف عند تمرير المؤشر أو التركيز عليه");
     const track = document.createElement("div");
     track.className = "index-ticker-track";
     const createSet = (duplicate = false) => {
@@ -701,9 +701,9 @@
       const d = await getJson(`${base}/api/markets?symbols=${encodeURIComponent(symbols)}`);
       const bySymbol = new Map((d.items || []).map(x => [x.symbol, x]));
       const frag = document.createDocumentFragment();
-      const indices = visible.filter(x => x.category === "index");
-      if (indices.length) frag.appendChild(buildIndexTicker(indices, bySymbol));
-      const groups = [["commodity","المعادن والطاقة"],["stock","الأسهم"]];
+      const referenceItems = visible.filter(x => x.category === "index" || x.category === "commodity");
+      if (referenceItems.length) frag.appendChild(buildIndexTicker(referenceItems, bySymbol));
+      const groups = [["stock","الأسهم"]];
       for (const [key,title] of groups) {
         const section = document.createElement("section"); section.className="market-group";
         section.appendChild(buildMarketHeader(title));
@@ -861,57 +861,60 @@
   let prayerCountdownTimer = null;
   let prayerCountdownTimes = null;
 
-  function prayerCountdownState(times, now = new Date()) {
-    const keys = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
+  function prayerPeriodState(times, now = new Date()) {
+    const events = ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"];
     const current = currentRiyadhMinutes(now);
-    const nextKey = nextPrayerKey(times, now);
-    const nextIndex = keys.indexOf(nextKey);
-    if (nextIndex < 0) return null;
-    let target = timeToMinutes(times?.[nextKey]);
-    if (target === null) return null;
-    let previous;
-    if (nextIndex === 0) {
-      previous = timeToMinutes(times?.isha);
-      if (previous === null) return null;
-      if (current >= previous) target += 1440;
-      else previous -= 1440;
-    } else {
-      previous = timeToMinutes(times?.[keys[nextIndex - 1]]);
-      if (previous === null) return null;
+    const mins = Object.fromEntries(events.map(k => [k, timeToMinutes(times?.[k])]));
+    if (events.some(k => mins[k] === null)) return null;
+    let currentKey = "isha", nextEventKey = "fajr", start = mins.isha - 1440, target = mins.fajr;
+    for (let i = 0; i < events.length - 1; i++) {
+      const a = events[i], b = events[i + 1];
+      if (current >= mins[a] && current < mins[b]) { currentKey = a; nextEventKey = b; start = mins[a]; target = mins[b]; break; }
     }
-    const span = Math.max(1, target - previous);
+    if (current >= mins.isha) { currentKey = "isha"; nextEventKey = "fajr"; start = mins.isha; target = mins.fajr + 1440; }
+    else if (current < mins.fajr) { currentKey = "isha"; nextEventKey = "fajr"; start = mins.isha - 1440; target = mins.fajr; }
+    const span = Math.max(1, target - start);
     const remaining = Math.max(0, target - current);
     const ratio = Math.max(0, Math.min(1, remaining / span));
-    return { nextKey, ratio, remaining };
+    return { currentKey, nextEventKey, nextPrayerKey: nextPrayerKey(times, now), ratio, remaining };
   }
 
   function updatePrayerCountdown() {
     if (!prayerCountdownTimes) return;
-    const state = prayerCountdownState(prayerCountdownTimes, new Date());
+    const state = prayerPeriodState(prayerCountdownTimes, new Date());
     if (!state) return;
-    const names={fajr:"الفجر",dhuhr:"الظهر",asr:"العصر",maghrib:"المغرب",isha:"العشاء"};
-    $("#prayerData")?.querySelectorAll("[data-prayer-key]").forEach(row => {
-      row.classList.remove("next-prayer");
+    const names={fajr:"الفجر",sunrise:"الشروق",dhuhr:"الظهر",asr:"العصر",maghrib:"المغرب",isha:"العشاء"};
+    const dl = $("#prayerData");
+    dl?.querySelectorAll("[data-prayer-key]").forEach(row => {
+      row.classList.remove("next-prayer", "current-period");
       row.removeAttribute("aria-label");
     });
-    $("#prayerData")?.querySelectorAll(".prayer-countdown").forEach(el => el.remove());
-    const row = $(`#prayerData [data-prayer-key="${state.nextKey}"]`);
-    if (!row) return;
-    row.classList.add("next-prayer");
+    dl?.querySelectorAll(".prayer-countdown").forEach(el => el.remove());
+
+    const nextPrayerRow = $(`#prayerData [data-prayer-key="${state.nextPrayerKey}"]`);
+    if (nextPrayerRow) {
+      nextPrayerRow.classList.add("next-prayer");
+      nextPrayerRow.setAttribute("aria-label", `${names[state.nextPrayerKey]}، الصلاة القادمة`);
+    }
+
+    const currentRow = $(`#prayerData [data-prayer-key="${state.currentKey}"]`);
+    if (!currentRow) return;
+    currentRow.classList.add("current-period");
     const meter = document.createElement("span");
     meter.className = "prayer-countdown";
+    if (state.ratio <= .10) meter.classList.add("is-danger");
+    else if (state.ratio <= .25) meter.classList.add("is-warning");
     meter.setAttribute("role", "progressbar");
     meter.setAttribute("aria-valuemin", "0");
     meter.setAttribute("aria-valuemax", "100");
     meter.setAttribute("aria-valuenow", String(Math.round(state.ratio * 100)));
-    meter.setAttribute("aria-label", `الوقت المتبقي حتى ${names[state.nextKey]}`);
+    meter.setAttribute("aria-label", `الوقت المتبقي من فترة ${names[state.currentKey]} حتى ${names[state.nextEventKey]}`);
     const fill = document.createElement("span");
     fill.className = "prayer-countdown-fill";
     fill.style.width = `${(state.ratio * 100).toFixed(1)}%`;
     meter.appendChild(fill);
-    const dd = row.querySelector("dd");
-    row.insertBefore(meter, dd || null);
-    row.setAttribute("aria-label", `${names[state.nextKey]}، الصلاة القادمة`);
+    const dd = currentRow.querySelector("dd");
+    currentRow.insertBefore(meter, dd || null);
   }
 
   function startPrayerCountdown(times) {

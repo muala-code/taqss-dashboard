@@ -637,3 +637,31 @@ html, body { touch-action: pan-x pan-y; }
   display: block;
   height: var(--prayer-heading-height, 4.6rem);
 }
+
+/* v0.21.0 — prayer current-period meter: dashed remaining time; next prayer stays softly highlighted. */
+.prayer-rows > div.current-period { grid-template-columns:max-content minmax(0,1fr) max-content; align-items:center; gap:clamp(.4rem,2vw,1rem); }
+.prayer-countdown {
+  height:5px; border-radius:0; overflow:hidden; direction:ltr;
+  background:repeating-linear-gradient(90deg,color-mix(in srgb,currentColor 12%,transparent) 0 8px,transparent 8px 13px);
+}
+.prayer-countdown-fill {
+  height:100%; border-radius:0;
+  background:repeating-linear-gradient(90deg,#15803d 0 8px,transparent 8px 13px);
+  transition:width .45s linear, filter .3s ease;
+}
+.prayer-countdown.is-warning .prayer-countdown-fill {
+  background:repeating-linear-gradient(90deg,#c47a13 0 8px,transparent 8px 13px);
+}
+.prayer-countdown.is-danger .prayer-countdown-fill {
+  background:repeating-linear-gradient(90deg,#b91c1c 0 8px,transparent 8px 13px);
+}
+.prayer-rows > div.next-prayer {
+  background:color-mix(in srgb,#d8b24a 10%,Canvas);
+}
+.prayer-rows > div.next-prayer:not(.current-period) {
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:.8rem;
+}
+@media(max-width:470px){
+  .prayer-rows > div.next-prayer:not(.current-period){grid-template-columns:minmax(0,1fr) auto;gap:.8rem;}
+}

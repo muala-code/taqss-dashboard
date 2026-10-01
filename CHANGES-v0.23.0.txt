@@ -1,0 +1,23 @@
+Taqss Dashboard development patch v0.23.0
+
+Mushaf
+- Continuous vertical Quran display instead of artificial screen-sized pages.
+- Surah divider with centered surah name; basmala below it except Surah At-Tawbah (9).
+- Surah name removed from the top reader bar; bar keeps index/fullscreen controls.
+- Clicking an ayah selects/highlights it only; it never starts audio.
+- Play starts from selected ayah, otherwise the first visible ayah; pause resumes normally unless a new ayah was selected.
+- Audio auto-scrolls when the current ayah is not fully visible.
+- Last visible surah/ayah is saved locally and restored on the same browser/device.
+- Background audio is no longer forcibly paused on document visibility change.
+- Media Session handlers added when supported by the browser/OS.
+
+Prayer
+- Current interval includes Fajr→Sunrise→Dhuhr→Asr→Maghrib→Isha→next Fajr.
+- Dashed remaining-time bar shrinks with time.
+- Bar becomes amber near the end and red very near the end.
+- Next prayer remains independently highlighted with a soft background.
+
+Markets
+- Ticker now includes indices + commodities/metals.
+- Detailed body keeps stocks only; commodity/metals category is removed from the body.
+- Existing ticker speed is unchanged.

@@ -1,0 +1,5 @@
+v0.23.3
+- Removed the decorative surah heading from inside the bounded Quran text area.
+- Kept the basmala as the only inline surah-opening marker where applicable; At-Tawbah remains without basmala.
+- Added lightweight decoration to the camera-safe header around Juz and Surah information.
+- Shortened the portrait reading area to avoid excessive height/internal scrolling while preserving responsive scaling on shorter phones.

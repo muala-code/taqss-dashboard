@@ -1,4 +1,4 @@
-/* Taqss Mushaf v0.21.7 — screen-sized reading segments, official KFGQPC Hafs v3.0.
+/* Taqss Mushaf v0.23.4 — surah-bounded screen segments + selectable reader font, official KFGQPC Hafs v3.0.
    Verse text is copied unchanged from the official source. Visual chunks never change it. */
 (() => {
   'use strict';
@@ -9,14 +9,14 @@
     rows: [], names: [], surahs: new Map(), mode: 'read',
     cursor: {surah: 1, ayah: 1, token: 0}, selected: null, history: [],
     nextCursor: null, lastSave: null, ready: false, layoutScheduled: false,
-    modalOpen: false, touch: null, rendering: false, audioAyah: 1, audioSurah: 1, audioToken: 0, reciter: "husary", repeat: 0, repeatPlayed: 0, audioKind: "verse", audioTrack: null, lastGood: null, audioFallbacks: new Set(), audioFailures: 0
+    modalOpen: false, touch: null, rendering: false, font: 'majma', audioAyah: 1, audioSurah: 1, audioToken: 0, reciter: "husary", repeat: 0, repeatPlayed: 0, audioKind: "verse", audioTrack: null, lastGood: null, audioFallbacks: new Set(), audioFailures: 0, audioSelectionPending: false, continuousBuilt: false, pendingScroll: false, scrollTimer: null, programmaticScrollUntil: 0
   };
   const clone = v => ({surah: v.surah, ayah: v.ayah, token: v.token || 0});
   const eq = (a,b) => !!a && !!b && a.surah===b.surah && a.ayah===b.ayah && (a.token||0)===(b.token||0);
   const fmt = number => Number(number).toLocaleString('ar-SA');
   function setStatus(message) {const el=$('#mushafLoadStatus'); el.textContent=message; el.hidden=!message;}
   function saved(key, fallback){try{return JSON.parse(localStorage.getItem(key)) ?? fallback;}catch{return fallback;}}
-  function saveSettings(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({mode:state.mode,surah:state.cursor.surah,reciter:state.reciter,repeat:state.repeat}));}catch{}}
+  function saveSettings(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({mode:state.mode,font:state.font,surah:state.cursor.surah,ayah:state.cursor.ayah,token:state.cursor.token||0,reciter:state.reciter,repeat:state.repeat}));}catch{}}
   function verseAt(c){return state.surahs.get(c.surah)?.[c.ayah-1] || null;}
   function validCursor(c){
     const s=Number(c?.surah), a=Number(c?.ayah), token=Number(c?.token||0);
@@ -87,6 +87,10 @@
   }
   function chooseVerse(verse){
     state.selected={surah:verse.surah,ayah:verse.ayah,token:0};
+    if(state.mode==='listen')state.audioSelectionPending=true;
+    document.querySelectorAll('#mushafVerses .mushaf-verse.is-selected').forEach(el=>el.classList.remove('is-selected'));
+    const selected=$(`#mushafVerses .mushaf-verse[data-verse="${verse.surah}:${verse.ayah}"]`);
+    selected?.classList.add('is-selected');
     $('#mushafPosition').textContent=`سورة ${state.names[verse.surah-1]} · الآية ${fmt(verse.ayah)}`;
   }
   function appendVerse(container,verse,content){
@@ -96,8 +100,8 @@
     el.textContent=content;
     el.tabIndex=0;el.setAttribute('role','button');
     el.setAttribute('aria-label',`سورة ${state.names[verse.surah-1]}، الآية ${fmt(verse.ayah)}، اختيار موضع الحفظ`);
-    el.addEventListener('click',()=>{chooseVerse(verse);if(state.mode==='listen')playVerse(verse.surah,verse.ayah);});
-    el.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();chooseVerse(verse);if(state.mode==='listen')playVerse(verse.surah,verse.ayah);}});
+    el.addEventListener('click',()=>chooseVerse(verse));
+    el.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();chooseVerse(verse);}});
     if(state.mode==='listen' && verse.surah===state.audioSurah && verse.ayah===state.audioAyah)el.classList.add('is-playing');
     container.append(el);
     return el;
@@ -136,14 +140,27 @@
   function layoutSegment(root, start) {
     root.style.paddingTop='';root.classList.remove('mushaf-short-surah');root.replaceChildren();
     let cursor=clone(start),steps=0,textWritten=false;
-    while(cursor&&steps++<750){
+    while(cursor&&steps++<900){
       const verse=verseAt(cursor);if(!verse)break;
       const tokens=words(verse);
-      if(cursor.token===0)addOpening(root,verse);
-      if(!fits(root)){
-        if(!textWritten)root.replaceChildren();
-        else root.lastElementChild?.classList.contains('mushaf-basmala')&&root.lastElementChild.remove();
-        break;
+      const atSurahStart=cursor.ayah===1&&cursor.token===0;
+      // A screen is never shared by two surahs. This keeps the header's surah
+      // identity unambiguous and avoids a crowded transition at the bottom.
+      if(textWritten && atSurahStart) break;
+      let openingNodes=[];
+      if(atSurahStart){
+        const before=[...root.children];
+        addSurahOpening(root,verse.surah);
+        openingNodes=[...root.children].filter(node=>!before.includes(node));
+        if(!fits(root)){
+          openingNodes.forEach(node=>node.remove());
+          // If the previous surah already occupies this screen, start the new
+          // surah on the next swipe instead of squeezing in an orphan basmala.
+          if(textWritten)break;
+          // On a very short screen keep the basmala when applicable and let the
+          // measurement below place at least the first token when possible.
+          addSurahOpening(root,verse.surah);
+        }
       }
       let node=appendVerse(root,verse,'');
       const remaining=tokens.length-cursor.token;
@@ -157,8 +174,11 @@
         }
         if(!low){
           node.remove();
-          if(!textWritten){
-            root.querySelector('.mushaf-basmala')?.remove();
+          // If this is a new surah reached after text from the previous one,
+          // remove its basmala too so the whole opening moves together.
+          if(textWritten&&atSurahStart){
+            openingNodes.forEach(el=>el.remove());
+          }else if(!textWritten){
             node=appendVerse(root,verse,'');
             writeSlice(node,verse,tokens,cursor.token,cursor.token+1);
             cursor={...cursor,token:cursor.token+1};
@@ -173,13 +193,11 @@
       }
       textWritten=true;
       cursor=nextVerse(cursor);
-      if(!cursor||cursor.surah!==verse.surah)break;
     }
-    // If an entire short surah fits, center its text without adding a second screen.
+    // Center a genuinely short complete surah; the following surah starts on the next swipe.
     const complete=cursor===null||cursor.surah!==start.surah;
     if(complete&&start.ayah===1&&start.token===0&&root.scrollHeight<root.clientHeight*.74){
       root.classList.add('mushaf-short-surah');
-      // Measurements include current padding, so this cannot hide any words.
       const available=root.clientHeight-root.scrollHeight;
       if(available>0)root.style.paddingTop=`${Math.floor(available*.42)+5}px`;
     }
@@ -220,56 +238,92 @@
     }
     return previous;
   }
+  function addSurahOpening(root, surah){
+    if(surah!==1&&surah!==9){
+      const basmala=document.createElement('div');basmala.className='mushaf-basmala';
+      basmala.dataset.surah=String(surah);
+      basmala.textContent=state.surahs.get(1)[0].text.replace(/\s*۝[٠-٩]+\s*$/u,'');root.append(basmala);
+    }
+  }
+  function buildContinuous(root){
+    root.replaceChildren();
+    for(let surah=1;surah<=114;surah++){
+      addSurahOpening(root,surah);
+      for(const verse of state.surahs.get(surah)||[]){
+        const node=appendVerse(root,verse,'');
+        writeSlice(node,verse,words(verse),0,words(verse).length);
+      }
+    }
+    state.continuousBuilt=true;
+  }
+  function verseNode(c){return c?$(`#mushafVerses .mushaf-verse[data-verse="${c.surah}:${c.ayah}"]`):null;}
+  function firstVisibleCursor(){
+    const root=$('#mushafVerses');if(!root)return null;
+    const box=root.getBoundingClientRect();
+    for(const el of root.querySelectorAll('.mushaf-verse')){
+      const r=el.getBoundingClientRect();
+      if(r.bottom>box.top+8&&r.top<box.bottom-8){const [surah,ayah]=el.dataset.verse.split(':').map(Number);return {surah,ayah,token:0};}
+    }
+    return null;
+  }
+  function scrollCursorIntoView(c, behavior='auto', block='start'){
+    const root=$('#mushafVerses'),node=verseNode(c);if(!root||!node)return;
+    state.programmaticScrollUntil=Date.now()+450;
+    node.scrollIntoView({behavior,block,inline:'nearest'});
+  }
+  function rememberVisiblePosition(){
+    if(Date.now()<state.programmaticScrollUntil)return;
+    const c=firstVisibleCursor();if(!c)return;
+    state.cursor=c;saveSettings();
+  }
+  function updatePageInfo(cursor){
+    const info=$('#mushafPageInfo'),juz=$('#mushafHeaderJuz'),surah=$('#mushafHeaderSurah');
+    const verse=verseAt(cursor);
+    if(!verse){if(info)info.textContent='';if(juz)juz.textContent='الجزء —';if(surah)surah.textContent='سورة —';return;}
+    const surahName=`سورة ${state.names[verse.surah-1]}`;
+    if(info)info.textContent=`الجزء ${fmt(verse.juz)} · ${surahName}`;
+    if(juz)juz.textContent=`الجزء ${fmt(verse.juz)}`;
+    if(surah)surah.textContent=surahName;
+  }
   function render(){
     if(!state.ready||state.rendering)return;
     const panel=$('#panel-mushaf'),root=$('#mushafVerses');
     if(panel.hidden||root.clientHeight<80||root.clientWidth<120)return;
     state.rendering=true;
     try{
-      const start=validCursor(state.cursor)||{surah:1,ayah:1,token:0};state.cursor=start;
+      const start=validCursor(state.cursor)||{surah:1,ayah:1,token:0};
+      state.cursor=start;
       state.nextCursor=layoutSegment(root,start);
-      const title=`سورة ${state.names[start.surah-1]}`;
-      $('#mushafReadingTitle').textContent=title;
-      const first=verseAt(start);if(first)chooseVerse(first);
-      root.setAttribute('aria-label',`${title}، المقطع الحالي يبدأ من الآية ${fmt(start.ayah)}. اسحب يميناً للمقطع التالي ويساراً للسابق`);
-      syncAudioHighlight();
-      saveSettings();
+      $('#mushafReadingTitle').textContent='';
+      root.setAttribute('aria-label','مقطع من المصحف؛ اسحب يمينًا للتقدم ويسارًا للرجوع');
+      updatePageInfo(start);
+      syncAudioHighlight();saveSettings();
     }finally{state.rendering=false;}
   }
   function scheduleRender(){
-    if(state.layoutScheduled)return;
-    state.layoutScheduled=true;
+    if(state.layoutScheduled)return;state.layoutScheduled=true;
     requestAnimationFrame(()=>{state.layoutScheduled=false;render();});
   }
   function move(direction){
     if(!state.ready||state.modalOpen)return;
-    let destination=null;
     if(direction==='next'){
-      destination=state.nextCursor;
-      if(!destination)return;
+      const next=validCursor(state.nextCursor);if(!next)return;
       state.history.push(clone(state.cursor));
+      if(state.history.length>300)state.history.shift();
+      state.cursor=next;
     }else{
-      destination=state.history.pop()||priorScreen(state.cursor);
-      if(!destination)return;
+      const prev=state.history.length?state.history.pop():priorScreen(state.cursor);
+      if(!prev)return;
+      state.cursor=prev;
     }
-    if(state.mode==='listen')stopAudio();
-    state.cursor=clone(destination);
+    state.selected=null;
     render();
   }
   function goTo(surah,ayah,token=0){
     const cursor=validCursor({surah,ayah,token});
     if(!cursor){setStatus('الآية المختارة غير متاحة.');return;}
-    if(state.mode==='listen' && (cursor.surah!==state.audioSurah||cursor.ayah!==state.audioAyah))stopAudio();
-    state.cursor=cursor;state.history=[];
+    state.cursor=cursor;state.history=[];state.pendingScroll=true;
     state.audioSurah=cursor.surah;state.audioAyah=cursor.ayah;
-    if(cursor.ayah>1 && state.mode!=='listen'){
-      const root=$('#mushafVerses');
-      if(root.clientWidth>100&&root.clientHeight>80){
-        const whole={surah:cursor.surah,ayah:1,token:0};
-        const end=layoutSegment(getMeasurementRoot(root),whole);
-        if(!end||end.surah!==cursor.surah)state.cursor=whole;
-      }
-    }
     syncAudioUI();setStatus('');render();
   }
   function openIndex(){
@@ -394,12 +448,18 @@
   }
   function showAudioVerse(surah,ayah){
     state.audioSurah=surah;state.audioAyah=ayah;
-    const displayed=Array.from($('#mushafVerses').querySelectorAll('.mushaf-verse'))
-      .some(el=>el.dataset.verse===`${surah}:${ayah}`);
-    if(state.cursor.surah!==surah||state.cursor.ayah>ayah||!displayed){
-      state.cursor={surah,ayah,token:0};state.history=[];render();
+    let node=$(`#mushafVerses .mushaf-verse[data-verse="${surah}:${ayah}"]`);
+    if(!node){
+      state.history.push(clone(state.cursor));
+      if(state.history.length>300)state.history.shift();
+      state.cursor={surah,ayah,token:0};
+      render();
+      node=$(`#mushafVerses .mushaf-verse[data-verse="${surah}:${ayah}"]`);
     }
-    syncAudioUI();
+    saveSettings();syncAudioUI();
+    if('mediaSession' in navigator){
+      try{navigator.mediaSession.metadata=new MediaMetadata({title:`سورة ${state.names[surah-1]} · الآية ${ayah}`,artist:byId(state.reciter).name,album:'القرآن الكريم'});}catch{}
+    }
   }
   function nextAudioVerse(surah,ayah){return nextVerse({surah,ayah,token:0});}
   // For <= 2 physical Medina pages, request every verse proactively, at most
@@ -435,6 +495,7 @@
     await playVerse(surah,ayah,true);
   }
   async function playVerse(surah,ayah,isFallback=false,preserveRepeat=false){
+    state.audioSelectionPending=false;
     if(state.mode!=='listen'||!state.ready||!state.surahs.get(surah)?.[ayah-1])return;
     const token=++state.audioToken;
     if(!preserveRepeat)state.repeatPlayed=0;
@@ -495,10 +556,12 @@
     });
     $('#mushafAudioPlay').addEventListener('click',()=>{
       if(!a.paused){a.pause();syncAudioUI();return;}
-      if(a.getAttribute('src')&&a.currentTime>0){
+      if(!state.audioSelectionPending&&a.getAttribute('src')&&a.currentTime>0){
         a.play().then(syncAudioUI).catch(()=>playVerse(state.audioSurah,state.audioAyah));return;
       }
-      playVerse(state.audioSurah,state.audioAyah);
+      const start=state.selected||firstVisibleCursor()||state.cursor;
+      state.audioSurah=start.surah;state.audioAyah=start.ayah;
+      playVerse(start.surah,start.ayah);
     });
     $('#mushafAudioPrev').addEventListener('click',()=>{
       const prev=prevVerse({surah:state.audioSurah,ayah:state.audioAyah,token:0});
@@ -540,12 +603,28 @@
       }
     });
     a.addEventListener('play',syncAudioUI);a.addEventListener('pause',syncAudioUI);
-    document.addEventListener('visibilitychange',()=>{
-      if(document.hidden&&!a.paused){a.pause();syncAudioUI();}
-    });
+    if('mediaSession' in navigator){
+      try{
+        navigator.mediaSession.setActionHandler('play',()=>$('#mushafAudioPlay').click());
+        navigator.mediaSession.setActionHandler('pause',()=>{if(!a.paused){a.pause();syncAudioUI();}});
+        navigator.mediaSession.setActionHandler('previoustrack',()=>$('#mushafAudioPrev').click());
+        navigator.mediaSession.setActionHandler('nexttrack',()=>$('#mushafAudioNext').click());
+      }catch{}
+    }
     // Fetch timing metadata before a user gesture when connectivity permits.
     getTimedCatalog();
   }
+  function applyFont(value, persist=true){
+    const allowed=new Set(['majma','uthmani','arabic']);
+    state.font=allowed.has(value)?value:'majma';
+    const panel=$('#panel-mushaf');
+    if(panel) panel.dataset.mushafFont=state.font;
+    const select=$('#mushafFontChoice');
+    if(select && select.value!==state.font) select.value=state.font;
+    if(persist) saveSettings();
+    scheduleRender();
+  }
+
   function setupFullscreen(){
     const reading=$('#mushafReading'),button=$('#mushafFullscreenButton');
     const active=()=>document.fullscreenElement===reading||reading.classList.contains('is-mushaf-fullscreen');
@@ -610,6 +689,7 @@
       event.preventDefault();move(event.key==='ArrowRight'?'next':'prev');
     });
     $('#mushafDisplayMode').addEventListener('change',event=>setMode(event.target.value));
+    $('#mushafFontChoice')?.addEventListener('change',event=>applyFont(event.target.value));
     $('#mushafIndexButton').addEventListener('click',openIndex);
     $('#mushafIndexClose').addEventListener('click',closeIndex);
     $('#mushafIndexCancel').addEventListener('click',closeIndex);
@@ -642,18 +722,20 @@
       closeIndex();goTo(cursor.surah,cursor.ayah,cursor.token);
     });
     state.reciter=byId(settings.reciter).id;$('#mushafReciter').value=state.reciter;
-    state.repeat=([0,2,3,5].includes(Number(settings.repeat))?Number(settings.repeat):(settings.repeat?2:0));state.repeatPlayed=0;setMode(settings.mode);
+    state.repeat=([0,2,3,5].includes(Number(settings.repeat))?Number(settings.repeat):(settings.repeat?2:0));state.repeatPlayed=0;
+    applyFont(settings.font || 'majma', false);
+    setMode(settings.mode);
     // The tab initially loads hidden. Observe its visibility and size before measuring line layout.
     const panel=$('#panel-mushaf');
-    new MutationObserver(()=>{if(!panel.hidden)scheduleRender();else if(!audio().paused){audio().pause();syncAudioUI();}}).observe(panel,{attributes:true,attributeFilter:['hidden']});
+    new MutationObserver(()=>{if(!panel.hidden)scheduleRender();}).observe(panel,{attributes:true,attributeFilter:['hidden']});
     if(typeof ResizeObserver==='function'){
       let lastW=0,lastH=0;
       new ResizeObserver(entries=>{
         const box=entries[0]?.contentRect;if(!box||!state.ready)return;
         const w=Math.round(box.width),h=Math.round(box.height);
-        if(Math.abs(w-lastW)>2||Math.abs(h-lastH)>2){lastW=w;lastH=h;state.history=[];scheduleRender();}
+        if(Math.abs(w-lastW)>2||Math.abs(h-lastH)>2){lastW=w;lastH=h;}
       }).observe($('#mushafVerses'));
-    }else window.addEventListener('resize',()=>{state.history=[];scheduleRender();},{passive:true});
+    }else window.addEventListener('resize',()=>{}, {passive:true});
     try{
       const response=await fetch('mushaf-data/kfgqpc_hafs_v30.json',{cache:'no-store'});
       if(!response.ok)throw Error(`HTTP ${response.status}`);
@@ -661,8 +743,9 @@
       state.ready=true;
       $('#mushafSavePlace').disabled=false;$('#mushafResume').disabled=false;
       const start=Number.isInteger(settings.surah)&&settings.surah>=1&&settings.surah<=114?settings.surah:1;
-      state.cursor={surah:start,ayah:1,token:0};
-      state.audioSurah=start;state.audioAyah=1;
+      const startAyah=Number.isInteger(settings.ayah)&&state.surahs.get(start)?.[settings.ayah-1]?settings.ayah:1;
+      state.cursor={surah:start,ayah:startAyah,token:0};state.pendingScroll=false;
+      state.audioSurah=start;state.audioAyah=startAyah;
       syncAudioUI();setStatus('');scheduleRender();
       document.fonts?.ready.then(scheduleRender).catch(()=>{});
     }catch(error){setStatus(`تعذّر تحميل بيانات المصحف: ${error.message}. تأكد من تشغيل الخادم ووجود الملف الرسمي.`);console.error('Mushaf official data:',error);}
