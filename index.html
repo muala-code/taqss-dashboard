@@ -7,7 +7,7 @@
   <title>طقس داشبورد</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌡️</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=0.24.0">
+  <link rel="stylesheet" href="styles.css?v=0.24.1">
   <link rel="stylesheet" href="mushaf.css?v=0.24.0">
 </head>
 <body>
@@ -74,7 +74,11 @@
         <button id="chartNext" type="button">التالي</button>
       </div>
       <p id="chartStatus" class="status"></p>
-      <dl id="historyStats" class="rows" hidden></dl>
+      <table id="historyStats" class="history-stats" hidden>
+        <caption class="visually-hidden">الإحصائيات السنوية للمحطة</caption>
+        <thead><tr><th scope="col">الإحصائية</th><th scope="col">القيمة</th><th scope="col">التاريخ</th></tr></thead>
+        <tbody></tbody>
+      </table>
       <div class="chart-wrap"><canvas id="historyChart"></canvas></div>
     </section>
 
@@ -205,13 +209,16 @@
 
     <section id="panel-quiz" class="panel" hidden>
       <h2>اختبر ثقافتك</h2>
-      <form id="quizSetup" class="quiz-setup">
-        <label>المجال<select id="quizCategory"><option value="mixed">منوّع</option><option value="islam">ثقافة إسلامية</option><option value="science">علوم وطبيعة</option><option value="geography">جغرافيا</option><option value="history">تاريخ</option><option value="language">لغة وأدب</option><option value="riddle">ألغاز</option></select></label>
+      <details id="quizOptions" class="quiz-options">
+        <summary>خيارات</summary>
+        <form id="quizSetup" class="quiz-setup">
+        <label>المجال<select id="quizCategory"><option value="mixed">متنوع</option><option value="islam">ثقافة إسلامية</option><option value="science">علوم وطبيعة</option><option value="geography">جغرافيا</option><option value="history">تاريخ</option><option value="language">لغة وأدب</option><option value="riddle">ألغاز</option></select></label>
         <label>الصعوبة<select id="quizDifficulty"><option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option></select></label>
         <label>عدد الأسئلة<select id="quizCount"><option>5</option><option>10</option><option>15</option></select></label>
         <p>لكل سؤال 30 ثانية. مغادرة المسابقة أو تبديل النافذة أو قفل الشاشة ينهي المحاولة بخطأ فني.</p>
-        <button type="submit">ابدأ المسابقة</button>
-      </form>
+        </form>
+      </details>
+      <button id="quizStart" class="quiz-start" type="submit" form="quizSetup">ابدأ المسابقة</button>
       <p id="quizStatus" role="status"></p><div id="quizPlay" hidden></div><div id="quizResult" hidden></div>
     </section>
   </main>
@@ -220,9 +227,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="config.js?v=0.20.1"></script>
   <script src="markets-config.js?v=0.23.5"></script>
-  <script src="app.js?v=0.24.0"></script>
+  <script src="app.js?v=0.24.1"></script>
   <script src="radar.js?v=0.20.1"></script>
   <script src="mushaf.js?v=0.24.0"></script>
-  <script src="quiz.js?v=0.24.0"></script>
+  <script src="quiz.js?v=0.24.1"></script>
 </body>
 </html>

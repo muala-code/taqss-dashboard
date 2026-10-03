@@ -486,11 +486,17 @@
       if (kind === "year-stats") {
         data = await getJson(`${String(cfg.enrichmentApiBase || dashboardBase()).replace(/\/$/, "")}/api/history/stats?year=${chartState.year}`);
         if(requestVersion!==chartLoadVersion)return;
-        const box = $("#historyStats"); box.replaceChildren();
+        const box = $("#historyStats tbody"); box.replaceChildren();
         for (const row of data.stats || []) {
-          const dt = document.createElement('dt'), dd = document.createElement('dd');
-          dt.textContent = row.label; dd.textContent = row.value === null ? '—' : `${row.value} ${row.unit || ''}${row.date ? ' · '+row.date.split('-').reverse().join('-') : ''}`;
-          const item=document.createElement("div"); item.append(dt,dd); box.append(item);
+          const item=document.createElement('tr'), label=document.createElement('th'), value=document.createElement('td'), date=document.createElement('td');
+          label.scope='row'; label.textContent=row.label==='أعلى مطر يومي'?'أعلى مطر':row.label;
+          if(label.textContent.includes('مطر'))item.className='stats-rain';
+          if(label.textContent==='أعلى مطر')label.title='أعلى كمية مطر مسجلة في يوم واحد';
+          const n=finite(row.value);
+          value.textContent=n===null ? '—' : `${row.unit==='يوم'?Math.round(n):n.toFixed(1)} ${row.unit || ''}`;
+          date.textContent=row.date ? new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn',{day:'numeric',month:'long',year:'numeric',timeZone:'Asia/Riyadh'}).format(new Date(row.date+'T12:00:00Z')) : '—';
+          date.className='stats-date';
+          item.append(label,value,date);box.append(item);
         }
         status.textContent = `${chartState.year} — ${data.coverage || ''}`; return;
       } else if (kind.startsWith("today-")) {
