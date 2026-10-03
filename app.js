@@ -17,6 +17,7 @@
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
   let chart = null;
+  let chartLoadVersion = 0;
   const loaded = new Set();
   const chartState = { monthYear: null, month: null, year: null };
   let selectedChartKind = "today-temp";
@@ -26,7 +27,7 @@
   const dashboardBase = () => String(cfg.dashboardApiBase || "").replace(/\/$/, "");
   const api = path => `${stationBase()}${path}`;
 
-  function finite(v) { const n = Number(v); return Number.isFinite(n) ? n : null; }
+  function finite(v) { if(v===null||v===undefined||v==="")return null; const n = Number(v); return Number.isFinite(n) ? n : null; }
   function fmt(v, digits = 1) {
     const n = finite(v); return n === null ? "—" : n.toLocaleString("ar-SA-u-nu-latn", { maximumFractionDigits: digits, minimumFractionDigits: 0 });
   }
@@ -170,8 +171,8 @@
     return (aYear * 12 + aMonth) - (bYear * 12 + bMonth);
   }
   function periodType(kind) {
-    if (kind === "month-temp-dew") return "month";
-    if (kind === "year-temp-rain") return "year";
+    if (kind.startsWith("month-")) return "month";
+    if (kind.startsWith("year-")) return "year";
     return "none";
   }
   function updatePeriodNav(kind) {
@@ -470,17 +471,31 @@
     };
   }
   async function loadChart(kind) {
+    const requestVersion=++chartLoadVersion;
     ensureChartState();
     updatePeriodNav(kind);
     const status = $("#chartStatus");
     const canvas = $("#historyChart");
     status.textContent = "جارٍ جلب البيانات…";
     destroyChart();
+    canvas.parentElement.hidden = kind === "year-stats";
+    $("#historyStats").hidden = kind !== "year-stats";
     const now = riyadhNowParts();
     try {
       let data, spec;
-      if (kind === "today-temp") {
+      if (kind === "year-stats") {
+        data = await getJson(`${String(cfg.enrichmentApiBase || dashboardBase()).replace(/\/$/, "")}/api/history/stats?year=${chartState.year}`);
+        if(requestVersion!==chartLoadVersion)return;
+        const box = $("#historyStats"); box.replaceChildren();
+        for (const row of data.stats || []) {
+          const dt = document.createElement('dt'), dd = document.createElement('dd');
+          dt.textContent = row.label; dd.textContent = row.value === null ? '—' : `${row.value} ${row.unit || ''}${row.date ? ' · '+row.date.split('-').reverse().join('-') : ''}`;
+          const item=document.createElement("div"); item.append(dt,dd); box.append(item);
+        }
+        status.textContent = `${chartState.year} — ${data.coverage || ''}`; return;
+      } else if (kind.startsWith("today-")) {
         data = await getJson(api("/api/history/today"));
+        if(requestVersion!==chartLoadVersion)return;
         const pts = (data.points || [])
           .filter(p => p?.observedAt && finite(p.temperature) !== null)
           .sort((a,b) => new Date(a.observedAt) - new Date(b.observedAt));
@@ -491,36 +506,31 @@
           title: { display: true, text: "°C" },
           ticks: { maxTicksLimit: 6 }
         };
+        const fields = kind === 'today-dew' ? [['temperature','الحرارة','#ea8b2c'],['dewPoint','نقطة الندى','#258a74']] : kind === 'today-wind' ? [['windSpeed','الرياح','#3487c5'],['windGust','الهبات','#c77045']] : kind === 'today-humidity' ? [['humidity','الرطوبة','#3487c5']] : kind === 'today-pressure' ? [['pressure','الضغط','#916bc2']] : [['temperature','الحرارة','#ea8b2c']];
+        const values = pts.flatMap(p=>fields.map(f=>finite(p[f[0]]))).filter(v=>v!==null);
+        options.scales.y = {...paddedRange(values,1), title:{display:true,text:kind==='today-humidity'?'%':kind==='today-wind'?'كم/س':kind==='today-pressure'?'hPa':'°C'}};
         spec = {
           type: "line",
           data: {
             labels: pts.map(p => new Date(p.observedAt).toLocaleTimeString("ar-SA-u-nu-latn", { timeZone: cfg.timeZone || "Asia/Riyadh", hour: "2-digit", minute: "2-digit", hour12: false })),
-            datasets: [{
-              label: "الحرارة",
-              data: temps,
-              borderWidth: 2,
-              pointRadius: 0,
-              pointHoverRadius: 4,
-              pointHitRadius: 12,
-              tension: .22,
-              spanGaps: true
-            }]
+            datasets: fields.map(([key,label,color])=>({label,data:pts.map(p=>finite(p[key])),borderColor:color,borderWidth:2,pointRadius:0,pointHitRadius:12,tension:.22,spanGaps:false}))
           },
           options
         };
         status.textContent = pts.length ? `قراءات اليوم: ${pts.length}` : "لا توجد بيانات كافية لليوم.";
-      } else if (kind === "year-temp-rain") {
+      } else if (kind.startsWith("year-")) {
         const selectedYear = chartState.year;
         data = await getJson(api(`/api/history/year?year=${selectedYear}`));
+        if(requestVersion!==chartLoadVersion)return;
         const pts = (data.points || []).slice().sort((a,b) => Number(a.month) - Number(b.month));
-        const months = ["ينا","فبر","مار","أبر","ماي","يون","يول","أغس","سبت","أكت","نوف","ديس"];
+        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
         const highs = pts.map(p => finite(p.tempHigh));
         const lows = pts.map(p => finite(p.tempLow));
         const options = baseChartOptions(12);
         options.scales.temp = {
           type: "linear",
           position: "right",
-          ...paddedRange([...highs, ...lows], 2),
+          beginAtZero: true,
           title: { display: true, text: "°C" },
           ticks: { maxTicksLimit: 6 }
         };
@@ -537,9 +547,10 @@
           data: {
             labels: pts.map(p => months[Number(p.month)-1] || String(p.month)),
             datasets: [
-              { type: "line", label: "العظمى", data: highs, yAxisID: "temp", borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: .2, spanGaps: true, order: 1 },
-              { type: "line", label: "الصغرى", data: lows, yAxisID: "temp", borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: .2, spanGaps: true, order: 1 },
-              { type: "bar", label: "المطر", data: pts.map(p => finite(p.rain) ?? 0), yAxisID: "rain", borderWidth: 0, barPercentage: .58, categoryPercentage: .78, order: 2 }
+              { label: "العظمى", data: highs, yAxisID: "temp", backgroundColor: "#ea8b2c", grouped:true },
+              { label: "الصغرى", data: lows, yAxisID: "temp", backgroundColor: "#3487c5", grouped:true },
+              { label: "المطر", data: pts.map(p => finite(p.rain)), yAxisID: "rain", backgroundColor: "#258a74", grouped:true }
+
             ]
           },
           options
@@ -549,7 +560,11 @@
         const selectedYear = chartState.monthYear;
         const selectedMonth = chartState.month;
         data = await getJson(api(`/api/history/month?year=${selectedYear}&month=${selectedMonth}`));
-        const pts = (data.points || []).slice().sort((a,b) => Number(a.day || 0) - Number(b.day || 0));
+        if(requestVersion!==chartLoadVersion)return;
+        const raw = new Map((data.points || []).map(p=>[Number(p.day || p.date.slice(8,10)),p]));
+        const lastDay=selectedYear===now.year&&selectedMonth===now.month?now.day:new Date(selectedYear,selectedMonth,0).getDate();
+        const pts = Array.from({length:lastDay},(_,i)=>raw.get(i+1)||{day:i+1,tempAvg:null,dewPoint:null,tempHigh:null,tempLow:null});
+        data.points=pts;
         const temps = pts.map(p => finite(p.tempAvg));
         const dews = pts.map(p => finite(p.dewPoint ?? p.dewPointAvg ?? p.dewptAvg));
         const options = baseChartOptions(8);
@@ -565,16 +580,26 @@
           data: {
             labels: pts.map(p => String(p.day || Number(String(p.date).slice(8,10)))),
             datasets: [
-              { label: "متوسط الحرارة", data: temps, yAxisID: "temp", borderWidth: 2, pointRadius: 2, pointHoverRadius: 5, tension: .22, spanGaps: true },
-              { label: "نقطة الندى", data: dews, yAxisID: "temp", borderWidth: 2, pointRadius: 2, pointHoverRadius: 5, tension: .22, spanGaps: true }
+              { label: "متوسط الحرارة", data: temps, yAxisID: "temp", borderWidth: 2, pointRadius: 2, pointHoverRadius: 5, tension: .22, spanGaps: false },
+              { label: "نقطة الندى", data: dews, yAxisID: "temp", borderWidth: 2, pointRadius: 2, pointHoverRadius: 5, tension: .22, spanGaps: false }
             ]
           },
           options
         };
         status.textContent = `${monthNames[selectedMonth - 1]} ${selectedYear} — متوسط الحرارة ونقطة الندى لكل يوم.`;
       }
+      if (kind === 'month-range') {
+        const pts = data.points || [];
+        spec.type = 'bar';
+        spec.data.labels = pts.map(p=>String(p.day || Number(p.date.slice(8,10))));
+        spec.data.datasets = [{label:'الصغرى — العظمى',data:pts.map(p=>finite(p.tempLow)!==null && finite(p.tempHigh)!==null ? [Number(p.tempLow),Number(p.tempHigh)] : null),backgroundColor:'#ea8b2c',yAxisID:'temp'}];
+        spec.options.scales.temp = {type:'linear',title:{display:true,text:'°C'}};
+        status.textContent = `${monthNames[chartState.month-1]} ${chartState.monthYear} — المدى الحراري لكل يوم.`;
+      }
+      if(requestVersion!==chartLoadVersion)return;
       chart = new Chart(canvas, spec);
     } catch (e) {
+      if(requestVersion!==chartLoadVersion)return;
       status.textContent = `تعذر جلب الشارت: ${e.message}`;
     }
   }
@@ -996,8 +1021,8 @@
   function selectChart(kind, label) {
     const now = riyadhNowParts();
     selectedChartKind = kind;
-    if (kind === "month-temp-dew") { chartState.monthYear = now.year; chartState.month = now.month; }
-    if (kind === "year-temp-rain") chartState.year = now.year;
+    if (kind.startsWith("month-")) { chartState.monthYear = now.year; chartState.month = now.month; }
+    if (kind.startsWith("year-")) chartState.year = now.year;
     const text = $("#chartPickerText");
     if (text) text.textContent = label;
     $("#chartPickerMenu")?.querySelectorAll("[data-chart]").forEach(option => {
@@ -1056,6 +1081,7 @@
   });
 
   function showTab(name) {
+    document.dispatchEvent(new CustomEvent("taqss:tab-change", {detail: name}));
     if (name !== "radar") document.dispatchEvent(new CustomEvent("taqss:radar-close"));
     if (name !== "markets") stopMarketsRefresh();
     $$(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===name));
@@ -1092,7 +1118,7 @@
   $$(".tab").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
   $("#chartPrev").addEventListener("click",()=>moveChartPeriod(-1));
   $("#chartNext").addEventListener("click",()=>moveChartPeriod(1));
-  const initial=["weather","history","radar","markets","prayer"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "weather";
+  const initial=["weather","history","radar","prayer","mushaf","markets","quiz"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "weather";
   showTab(initial);
 })();
 
