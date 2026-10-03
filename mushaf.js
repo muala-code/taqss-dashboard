@@ -9,14 +9,14 @@
     rows: [], names: [], surahs: new Map(), mode: 'read',
     cursor: {surah: 1, ayah: 1, token: 0}, selected: null, history: [],
     nextCursor: null, lastSave: null, ready: false, layoutScheduled: false,
-    modalOpen: false, touch: null, rendering: false, font: 'majma', audioAyah: 1, audioSurah: 1, audioToken: 0, reciter: "husary", repeat: 0, repeatPlayed: 0, audioKind: "verse", audioTrack: null, lastGood: null, audioFallbacks: new Set(), audioFailures: 0, audioSelectionPending: false, continuousBuilt: false, pendingScroll: false, scrollTimer: null, programmaticScrollUntil: 0
+    modalOpen: false, touch: null, rendering: false, fontSize: 'medium', font: 'majma', audioAyah: 1, audioSurah: 1, audioToken: 0, reciter: "husary", repeat: 0, repeatPlayed: 0, audioKind: "verse", audioTrack: null, lastGood: null, audioFallbacks: new Set(), audioFailures: 0, audioSelectionPending: false, continuousBuilt: false, pendingScroll: false, scrollTimer: null, programmaticScrollUntil: 0
   };
   const clone = v => ({surah: v.surah, ayah: v.ayah, token: v.token || 0});
   const eq = (a,b) => !!a && !!b && a.surah===b.surah && a.ayah===b.ayah && (a.token||0)===(b.token||0);
   const fmt = number => Number(number).toLocaleString('ar-SA');
   function setStatus(message) {const el=$('#mushafLoadStatus'); el.textContent=message; el.hidden=!message;}
   function saved(key, fallback){try{return JSON.parse(localStorage.getItem(key)) ?? fallback;}catch{return fallback;}}
-  function saveSettings(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({mode:state.mode,font:state.font,surah:state.cursor.surah,ayah:state.cursor.ayah,token:state.cursor.token||0,reciter:state.reciter,repeat:state.repeat}));}catch{}}
+  function saveSettings(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({mode:state.mode,fontSize:state.fontSize,font:state.font,surah:state.cursor.surah,ayah:state.cursor.ayah,token:state.cursor.token||0,reciter:state.reciter,repeat:state.repeat}));}catch{}}
   function verseAt(c){return state.surahs.get(c.surah)?.[c.ayah-1] || null;}
   function validCursor(c){
     const s=Number(c?.surah), a=Number(c?.ayah), token=Number(c?.token||0);
@@ -725,6 +725,10 @@
     document.addEventListener('touchstart', () => {
       document.documentElement.classList.add('mushaf-has-touch');
     }, {once:true, passive:true});
+    state.fontSize=['small','medium','large'].includes(settings.fontSize)?settings.fontSize:'medium';
+    const applySize=()=>{ $('#panel-mushaf').dataset.mushafSize=state.fontSize; document.querySelectorAll('[name="mushafSize"]').forEach(el=>el.checked=el.value===state.fontSize); scheduleRender(); };
+    applySize();
+    document.querySelectorAll('[name="mushafSize"]').forEach(el=>el.addEventListener('change',()=>{state.fontSize=el.value;applySize();saveSettings();}));
     setupFullscreen();setupSwipe();setupAudio();setupMushafPickers();
     $('#mushafNavPrev').addEventListener('click',()=>move('prev'));
     $('#mushafNavNext').addEventListener('click',()=>move('next'));

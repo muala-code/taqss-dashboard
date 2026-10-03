@@ -5,6 +5,9 @@ window.TAQSS_CONFIG = {
   // عامل طقس داشبورد المنشور؛ الأسعار تعمل منه، وبقية الخدمات تُمرّر لعامل المحطة عند عدم وجود مفتاح WU.
   dashboardApiBase: "https://taqss-dashboard-api.muala99.workers.dev",
 
+  // رابط عامل الإثراء بعد نشره (الإحصائيات والمسابقة).
+  enrichmentApiBase: "https://taqss-enrichment-api.muala99.workers.dev/",
+
   stationId: "IMEDIN86",
   stationLocation: "قرب أبيار الماشي",
   stationStartDate: "2026-06-05",

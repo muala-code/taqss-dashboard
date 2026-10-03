@@ -677,3 +677,10 @@ html:not(.mushaf-has-touch) #panel-mushaf .mushaf-tv-navigation {
 #panel-mushaf .mushaf-reciter-wrap .mushaf-picker-button {min-height:32px;font-size:.75rem;}
 
 #panel-mushaf .mushaf-reciter-wrap .mushaf-picker-menu {top:auto;bottom:100%;min-width:190px;}
+
+/* Small, deliberate steps; reuse responsive base size and layout measurement. */
+#panel-mushaf {--mushaf-size-factor:1;}
+#panel-mushaf[data-mushaf-size="small"] {--mushaf-size-factor:.92;}
+#panel-mushaf[data-mushaf-size="large"] {--mushaf-size-factor:1.08;}
+#panel-mushaf .mushaf-verses {font-size:calc(var(--mushaf-type-size) * var(--mushaf-size-factor)) !important;}
+.mushaf-size-controls {display:flex;gap:1rem;border:0;padding:.4rem 0;margin:.4rem 0;}
