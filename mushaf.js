@@ -122,18 +122,14 @@
     return verse.surah===1&&verse.ayah===1?text.replace(/\s*۝[٠-٩]+\s*$/u,''):text;
   }
   function writeSlice(node,verse,tokens,from,to){
-    const text=sliceForDisplay(verse,tokens,from,to);
-    // A nonbreaking visual group keeps the official ۝ number beside its final word.
-    // All textContent still derives verbatim from the official data, except the
-    // previously approved unnumbered Fatiha basmala display.
-    const end=text.match(/(\S+\s+۝[٠-٩]+\s*)$/u);
-    if(!end){node.textContent=text;return;}
+    node.dataset.from=String(from);node.dataset.to=String(to);
     node.replaceChildren();
-    node.append(document.createTextNode(text.slice(0,-end[1].length)));
-    const terminal=document.createElement('span');
-    terminal.className='mushaf-verse-ending';
-    terminal.textContent=end[1];
-    node.append(terminal);
+    for(let i=from;i<to;i++){
+      const word=document.createElement('span');word.className='mushaf-word';word.dataset.word=String(i);
+      word.textContent=sliceForDisplay(verse,tokens,i,i+1);
+      if(/۝/u.test(word.textContent))word.classList.add('mushaf-verse-ending');
+      node.append(word);
+    }
   }
   // Identical measured layout is used forwards and backwards; backwards never
   // jumps to the preceding verse alone, which orphaned short-surah endings.
@@ -166,6 +162,15 @@
       const remaining=tokens.length-cursor.token;
       writeSlice(node,verse,tokens,cursor.token,tokens.length);
       if(!fits(root)){
+        if(textWritten && cursor.token===0){
+          const probe=root.cloneNode(false);probe.removeAttribute('id');probe.setAttribute('aria-hidden','true');
+          probe.style.cssText='position:absolute!important;visibility:hidden!important;pointer-events:none!important;flex:none!important;';
+          probe.style.width=root.getBoundingClientRect().width+'px';probe.style.height=root.getBoundingClientRect().height+'px';
+          root.parentElement.append(probe);
+          const single=appendVerse(probe,verse,'');writeSlice(single,verse,tokens,0,tokens.length);
+          const fitsAlone=fits(probe);probe.remove();
+          if(fitsAlone){node.remove();break;}
+        }
         let low=0,high=remaining;
         while(low<high){
           const mid=Math.ceil((low+high)/2);
@@ -293,6 +298,11 @@
     try{
       const start=validCursor(state.cursor)||{surah:1,ayah:1,token:0};
       state.cursor=start;
+      // Auto sizing depends only on viewport geometry, so page history remains reproducible.
+      if(state.fontSize==='auto'){
+        const area=root.clientWidth*root.clientHeight;
+        panel.style.setProperty('--mushaf-size-factor',String(Math.max(.92,Math.min(1.08,Math.sqrt(area/260000)))));
+      }else panel.style.removeProperty('--mushaf-size-factor');
       state.nextCursor=layoutSegment(root,start);
       $('#mushafReadingTitle').textContent='';
       root.setAttribute('aria-label','مقطع من المصحف؛ اسحب يمينًا للتقدم ويسارًا للرجوع');
@@ -403,13 +413,13 @@
   // EveryAyah: individual verse files. MP3Quran: surah recordings only when
   // that exact read+surah has official timing rows. No inferred timestamps.
   const RECITERS = [
-    {id:'husary',name:'محمود خليل الحصري',folder:'Husary_64kbps'},
+    {wordTimed:true,id:'husary',name:'محمود خليل الحصري',folder:'Husary_64kbps'},
     {id:'ayyub',name:'محمد أيوب',folder:'Muhammad_Ayyoub_128kbps'},
     {id:'basit',name:'عبدالباسط عبدالصمد (مرتل)',folder:'Abdul_Basit_Murattal_192kbps'},
-    {id:'minshawi',name:'محمد صديق المنشاوي (مرتل)',folder:'Minshawy_Murattal_128kbps'},
+    {wordTimed:true,id:'minshawi',name:'محمد صديق المنشاوي (مرتل)',folder:'Minshawy_Murattal_128kbps'},
     {id:'sudais',name:'عبدالرحمن السديس',folder:'Abdurrahmaan_As-Sudais_192kbps'},
     {id:'maher',name:'ماهر المعيقلي',folder:'Maher_AlMuaiqly_64kbps'},
-    {id:'taleb',name:'أحمد بن طالب حميد',timed:true,pattern:/أحمد بن طالب|احمد بن طالب|ahmad bin tal/i},
+    {id:'taleb',name:'أحمد بن طالب حميد',timed:true,pattern:/أحمد بن طالب|احمد بن طالب|أحمد طالب بن حميد|احمد طالب بن حميد|ahmad bin tal/i},
     {id:'ali',name:'علي جابر',timed:true,pattern:/علي جابر|ali jab/i},
     {id:'hudhaify',name:'علي الحذيفي',timed:true,pattern:/الحذيفي|huthaif|hudhaif/i},
     {id:'akhdar',name:'إبراهيم الأخضر',timed:true,pattern:/الأخضر|الاخضر|akh[d]?ar/i}
@@ -432,7 +442,7 @@
     if(timingCache.has(key))return timingCache.get(key);
     const task=(async()=>{
       const data=await getTimedCatalog();
-      const match=data.reads.find(r=>reciter.pattern.test(r.name||''));
+      const match=data.reads.find(r=>reciter.pattern.test(r.name||'')&&(!r.rewaya||/حفص/.test(r.rewaya)));
       if(!match)return null;
       const catalog=data.reciters.find(c=>reciter.pattern.test(c.name||''));
       const candidate=catalog?.moshaf?.find(m=>Number(m.id)===Number(match.id));
@@ -471,6 +481,33 @@
     repeat.setAttribute('aria-label',n?`تكرار الآية ${n} مرات؛ اضغط لتغيير العدد`:'تفعيل تكرار الآية مرتين');
     repeat.title=n?`تكرار الآية ×${n}؛ اضغط لاختيار عدد آخر`:'تكرار الآية متوقف؛ اضغط للتفعيل مرتين';
   }
+  const wordTimingCache=new Map();
+  let currentWordTimings=null,wordTimingToken=0;
+  async function loadWordTimings(r,surah,ayah){
+    const token=++wordTimingToken;currentWordTimings=null;
+    $('#mushafVerses').classList.remove('has-word-timing');
+    if(!r.wordTimed)return;
+    const cacheKey=r.folder+':'+surah;
+    if(!wordTimingCache.has(cacheKey))wordTimingCache.set(cacheKey,fetch(`mushaf-timings/${r.folder}/${surah}.json`).then(r=>r.ok?r.json():null).catch(()=>null));
+    const rows=await wordTimingCache.get(cacheKey);if(token!==wordTimingToken)return;
+    const row=rows?.[String(ayah)],count=words(verseAt({surah,ayah})).length;
+    if(!Array.isArray(row)||!row.length||row.some(x=>x.length!==4||!x.every(Number.isFinite)||x[0]<0||x[1]>count||x[1]<=x[0]||x[3]<=x[2]))return;
+    if(Math.max(...row.map(x=>x[1]))!==count)return;
+    currentWordTimings=row;$('#mushafVerses').classList.add('has-word-timing');followAudioWords();
+  }
+  function followAudioWords(){
+    const root=$('#mushafVerses');root.querySelectorAll('.is-speaking').forEach(n=>n.classList.remove('is-speaking'));
+    if(state.mode!=='listen'||!currentWordTimings||state.audioKind!=='verse')return;
+    const ms=audio().currentTime*1000,segment=currentWordTimings.find(x=>ms>=x[2]&&ms<x[3]);if(!segment)return;
+    const [from,to]=segment,verseKey=`${state.audioSurah}:${state.audioAyah}`;
+    let node=root.querySelector(`.mushaf-verse[data-verse="${verseKey}"]`);
+    if(!node||from<Number(node.dataset.from)||from>=Number(node.dataset.to)){
+      state.history.push(clone(state.cursor));if(state.history.length>300)state.history.shift();
+      state.cursor={surah:state.audioSurah,ayah:state.audioAyah,token:from};render();
+      node=root.querySelector(`.mushaf-verse[data-verse="${verseKey}"]`);
+    }
+    node?.querySelectorAll('.mushaf-word').forEach(w=>w.classList.toggle('is-speaking',Number(w.dataset.word)>=from&&Number(w.dataset.word)<to));
+  }
   function syncAudioHighlight(){
     document.querySelectorAll('#mushafVerses .mushaf-verse').forEach(node=>{
       node.classList.toggle('is-playing',state.mode==='listen'&&node.dataset.verse===`${state.audioSurah}:${state.audioAyah}`);
@@ -490,6 +527,8 @@
     syncAudioHighlight();
   }
   function stopAudio(){
+    ++wordTimingToken;currentWordTimings=null;$('#mushafVerses').classList.remove('has-word-timing');
+    $('#mushafVerses').querySelectorAll('.is-speaking').forEach(n=>n.classList.remove('is-speaking'));
     ++state.audioToken;const a=audio();a.pause();a.removeAttribute('src');a.load();
     state.audioTrack=null;state.audioFailures=0;state.audioFallbacks.clear();state.repeatPlayed=0;syncAudioUI();
   }
@@ -546,6 +585,8 @@
     if(state.mode!=='listen'||!state.ready||!state.surahs.get(surah)?.[ayah-1])return;
     const token=++state.audioToken;
     if(!preserveRepeat)state.repeatPlayed=0;
+    ++wordTimingToken;currentWordTimings=null;$('#mushafVerses').classList.remove('has-word-timing');
+    $('#mushafVerses').querySelectorAll('.is-speaking').forEach(n=>n.classList.remove('is-speaking'));
     const a=audio();a.pause();state.audioTrack=null;showAudioVerse(surah,ayah);
     const r=byId(state.reciter);state.audioFallbacks.add(r.id);
     if(!isFallback)state.audioFallbacks=new Set([r.id]);
@@ -553,6 +594,7 @@
     try{
       if(r.folder){
         state.audioKind='verse';a.src=verseURL(r,surah,ayah);
+        loadWordTimings(r,surah,ayah);
         preloadVerses(r,surah,ayah);
         await a.play();
       }else{
@@ -629,6 +671,7 @@
     });
     let timedTransition=false;
     a.addEventListener('timeupdate',()=>{
+      if(!a.paused)followAudioWords();
       const track=state.audioTrack;
       if(state.mode!=='listen'||state.audioKind!=='timed'||!track||timedTransition||a.paused)return;
       const end=track.times[state.audioAyah-1]?.end;
@@ -649,7 +692,15 @@
         timedTransition=false;
       }
     });
-    a.addEventListener('play',syncAudioUI);a.addEventListener('pause',syncAudioUI);
+    let followFrame=null,lastFollow=0;
+    const stopFollow=()=>{if(followFrame!==null)cancelAnimationFrame(followFrame);followFrame=null;};
+    const frame=now=>{
+      if(a.paused||state.mode!=='listen'){stopFollow();return;}
+      if(!document.hidden&&now-lastFollow>=80){lastFollow=now;followAudioWords();}
+      followFrame=requestAnimationFrame(frame);
+    };
+    a.addEventListener('play',()=>{syncAudioUI();stopFollow();followFrame=requestAnimationFrame(frame);});
+    a.addEventListener('pause',()=>{stopFollow();syncAudioUI();});
     if('mediaSession' in navigator){
       try{
         navigator.mediaSession.setActionHandler('play',()=>$('#mushafAudioPlay').click());
@@ -725,10 +776,10 @@
     document.addEventListener('touchstart', () => {
       document.documentElement.classList.add('mushaf-has-touch');
     }, {once:true, passive:true});
-    state.fontSize=['small','medium','large'].includes(settings.fontSize)?settings.fontSize:'medium';
+    state.fontSize=['auto','small','medium','large'].includes(settings.fontSize)?settings.fontSize:'medium';
     const applySize=()=>{ $('#panel-mushaf').dataset.mushafSize=state.fontSize; document.querySelectorAll('[name="mushafSize"]').forEach(el=>el.checked=el.value===state.fontSize); scheduleRender(); };
     applySize();
-    document.querySelectorAll('[name="mushafSize"]').forEach(el=>el.addEventListener('change',()=>{state.fontSize=el.value;applySize();saveSettings();}));
+    document.querySelectorAll('[name="mushafSize"]').forEach(el=>el.addEventListener('change',()=>{state.fontSize=el.value;state.history=[];applySize();saveSettings();}));
     setupFullscreen();setupSwipe();setupAudio();setupMushafPickers();
     $('#mushafNavPrev').addEventListener('click',()=>move('prev'));
     $('#mushafNavNext').addEventListener('click',()=>move('next'));
@@ -785,9 +836,9 @@
       new ResizeObserver(entries=>{
         const box=entries[0]?.contentRect;if(!box||!state.ready)return;
         const w=Math.round(box.width),h=Math.round(box.height);
-        if(Math.abs(w-lastW)>2||Math.abs(h-lastH)>2){lastW=w;lastH=h;}
+        if(Math.abs(w-lastW)>2||Math.abs(h-lastH)>2){lastW=w;lastH=h;state.history=[];scheduleRender();}
       }).observe($('#mushafVerses'));
-    }else window.addEventListener('resize',()=>{}, {passive:true});
+    }else window.addEventListener('resize',()=>{state.history=[];scheduleRender();}, {passive:true});
     try{
       const response=await fetch('mushaf-data/kfgqpc_hafs_v30.json',{cache:'no-store'});
       if(!response.ok)throw Error(`HTTP ${response.status}`);

@@ -8,7 +8,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌡️</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="styles.css?v=0.24.2">
-  <link rel="stylesheet" href="mushaf.css?v=0.24.2a">
+  <link rel="stylesheet" href="mushaf.css?v=0.24.3">
 </head>
 <body>
   <nav class="tabs" aria-label="التبويبات الرئيسية">
@@ -184,6 +184,7 @@
               </div>
             </div>
             <fieldset class="mushaf-size-controls"><legend>حجم النص القرآني</legend>
+              <label><input type="radio" name="mushafSize" value="auto"> تلقائي</label>
               <label><input type="radio" name="mushafSize" value="small"> صغير</label>
               <label><input type="radio" name="mushafSize" value="medium" checked> وسط</label>
               <label><input type="radio" name="mushafSize" value="large"> مكبّر</label>
@@ -193,6 +194,7 @@
               <button id="mushafIndexCancel" type="button">إلغاء</button>
             </div>
           </form>
+          <p class="mushaf-timing-source">توقيتات الكلمات: <a href="https://github.com/cpfair/quran-align" target="_blank" rel="noopener">Colin P. Fair · quran-align</a>، <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></p>
           <div class="mushaf-index-bookmarks" role="group" aria-label="موضع القراءة">
             <div class="mushaf-index-bookmark-actions">
               <button id="mushafSavePlace" type="button" disabled>حفظ الموضع</button>
@@ -229,7 +231,7 @@
   <script src="markets-config.js?v=0.23.5"></script>
   <script src="app.js?v=0.24.1"></script>
   <script src="radar.js?v=0.20.1"></script>
-  <script src="mushaf.js?v=0.24.0"></script>
+  <script src="mushaf.js?v=0.24.3"></script>
   <script src="quiz.js?v=0.24.2"></script>
 </body>
 </html>

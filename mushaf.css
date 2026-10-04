@@ -705,3 +705,15 @@ html:not(.mushaf-has-touch) #panel-mushaf .mushaf-tv-navigation {
   outline:2px solid #c6535b;outline-offset:-2px;
 }
 #panel-mushaf .mushaf-tv-navigation button:disabled {opacity:.4;cursor:default;}
+
+/* v0.24.3: tighter lines and consistent bounded fullscreen pages. */
+#panel-mushaf .mushaf-page-mode .mushaf-verses,
+#panel-mushaf .mushaf-text-mode .mushaf-verses {line-height:1.8;}
+#panel-mushaf .mushaf-reading:is(:fullscreen,.is-mushaf-fullscreen) .mushaf-verses {
+  overflow:hidden!important;max-width:none!important;min-height:0;
+}
+#panel-mushaf .mushaf-verses.has-word-timing .mushaf-verse.is-playing {color:inherit!important;}
+#panel-mushaf .mushaf-verses .mushaf-word.is-speaking {color:#b3262e!important;background:transparent!important;}
+
+.mushaf-size-controls {flex-wrap:wrap;gap:.6rem;}
+.mushaf-timing-source {font:.7rem/1.6 system-ui,sans-serif;margin:.5rem 0;}
