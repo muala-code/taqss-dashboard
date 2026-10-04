@@ -716,3 +716,17 @@ html, body { touch-action: pan-x pan-y; }
 .history-stats tbody tr.stats-rain td:first-of-type {color:#247caa;}
 .history-stats .stats-date {font-size:.75rem;color:#6b756f;}
 @media (max-width:370px) {.history-stats {font-size:.76rem;}.history-stats .stats-date {font-size:.68rem;}.history-stats th,.history-stats td {padding-inline:.18rem;}}
+
+/* v0.24.2: compact quiz result with optional answer review. */
+.quiz-result-summary {display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:.5rem .8rem;}
+.quiz-result-summary p {margin:.3rem 0;font-size:.85rem;}
+.quiz-result-summary button {font:inherit;font-size:.82rem;padding:.4rem .65rem;border:1px solid #9ab6a6;border-radius:.4rem;background:#edf5f0;color:#224c36;cursor:pointer;}
+#quizResult .quiz-score {width:105px;height:105px;font-size:1.5rem;margin:.65rem auto;}
+#quizReview[hidden] {display:none;}
+#quizReview {margin-top:.7rem;}
+#quizReview details {padding:.5rem 0;border-bottom:1px solid #d7dfda;}
+#quizReview summary {display:flex;align-items:baseline;gap:.5rem;cursor:pointer;font-size:.9rem;}
+#quizReview summary > span:first-child {font-weight:800;flex:none;}
+.quiz-review-correct {color:#16713b;}
+.quiz-review-wrong {color:#b02b2b;}
+#quizReview p {font-size:.85rem;line-height:1.7;}

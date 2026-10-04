@@ -9,18 +9,25 @@
   function finish(d,technical=false){clearInterval(timer);session=null;busy=false;$('#quizPlay').hidden=true;showSetup();const root=$('#quizResult');root.hidden=false;root.replaceChildren();
     if(technical){const p=document.createElement('p');p.textContent='انتهت المسابقة بخطأ فني بسبب مغادرة الشاشة.';root.append(p);return;}
     const score=document.createElement('div');score.className='quiz-score';const pct=Math.round(100*d.correct/d.total);score.style.setProperty('--score',pct+'%');score.textContent=pct+'%';score.setAttribute('aria-label','الدرجة '+pct+' بالمئة');root.append(score);
-    const summary=document.createElement('p');summary.textContent=`${d.correct} صحيحة · ${d.wrong} خاطئة · ${d.timeout} انتهى وقتها — من ${d.total}`;root.append(summary);
-    for(const a of d.review){const item=document.createElement('details'),title=document.createElement('summary'),p=document.createElement('p');title.textContent=(a.ok?'✓ ':a.timeout?'⌛ ':'✗ ')+a.question;p.textContent='الإجابة الصحيحة: '+a.answer+(a.explanation?' — '+a.explanation:'');item.append(title,p);root.append(item);}
+    const row=document.createElement('div');row.className='quiz-result-summary';
+    const summary=document.createElement('p');summary.textContent=`${d.correct} صحيحة · ${d.wrong} خاطئة · ${d.timeout} انتهى وقتها — من ${d.total}`;
+    const review=document.createElement('div');review.id='quizReview';review.hidden=true;
+    const toggle=button('عرض الإجابات',()=>{review.hidden=!review.hidden;toggle.textContent=review.hidden?'عرض الإجابات':'إخفاء الإجابات';toggle.setAttribute('aria-expanded',String(!review.hidden));});
+    toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls',review.id);row.append(summary,toggle);root.append(row,review);
+    for(const a of d.review){
+      const item=document.createElement('details'),title=document.createElement('summary'),mark=document.createElement('span'),text=document.createElement('span'),p=document.createElement('p');
+      mark.className=a.ok?'quiz-review-correct':'quiz-review-wrong';mark.textContent=a.ok?'✓':'✗';mark.setAttribute('aria-label',a.ok?'إجابة صحيحة':a.timeout?'انتهى الوقت':'إجابة خاطئة');
+      text.textContent=a.question+(a.timeout?' — انتهى الوقت':'');title.append(mark,text);
+      p.textContent='الإجابة الصحيحة: '+a.answer+(a.explanation?' — '+a.explanation:'');item.append(title,p);review.append(item);
+    }
   }
   function render(d){session=d;remember([d.question.id]);const root=$('#quizPlay');root.hidden=false;root.replaceChildren();$('#quizResult').hidden=true;
     const head=document.createElement('div');head.className='quiz-info';
     const counter=document.createElement('span');counter.className='quiz-counter';counter.textContent=`${d.index+1} / ${d.total}`;counter.setAttribute('aria-label',`السؤال ${d.index+1} من ${d.total}`);
-    const level=document.createElement('span');level.textContent='المستوى: '+attemptSettings.difficultyLabel;
-    const category=document.createElement('span');category.textContent='المجال: '+attemptSettings.categoryLabel;
     const time=document.createElement('span');time.className='quiz-time';
     const timeLabel=document.createElement('span');timeLabel.textContent='زمن الإجابة';
     const clock=document.createElement('span');clock.className='quiz-time-track';clock.setAttribute('role','progressbar');clock.setAttribute('aria-label','الوقت المتبقي للإجابة');clock.setAttribute('aria-valuemin','0');clock.setAttribute('aria-valuemax','30');
-    const fill=document.createElement('span');fill.className='quiz-time-fill';clock.append(fill);time.append(timeLabel,clock);head.append(counter,level,category,time);root.append(head);
+    const fill=document.createElement('span');fill.className='quiz-time-fill';clock.append(fill);time.append(timeLabel,clock);head.append(counter,time);root.append(head);
     const question=document.createElement('div');question.className='quiz-question';const text=document.createElement('h3');text.textContent=d.question.text;question.append(text);
     if(d.question.image){const img=document.createElement('img');img.src=d.question.image;img.alt=d.question.imageAlt||'صورة السؤال';img.onerror=()=>{$('#quizStatus').textContent='تعذر عرض الصورة. أعد المحاولة عند توفر الاتصال.';session=null;clearInterval(timer);showSetup();root.hidden=true;};question.append(img);}root.append(question);
     const cards=document.createElement('div');cards.className='quiz-answers';d.question.options.forEach((v,i)=>cards.append(button(v,()=>answer(i))));root.append(cards);

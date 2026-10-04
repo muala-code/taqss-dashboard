@@ -684,3 +684,24 @@ html:not(.mushaf-has-touch) #panel-mushaf .mushaf-tv-navigation {
 #panel-mushaf[data-mushaf-size="large"] {--mushaf-size-factor:1.08;}
 #panel-mushaf .mushaf-verses {font-size:calc(var(--mushaf-type-size) * var(--mushaf-size-factor)) !important;}
 .mushaf-size-controls {display:flex;gap:1rem;border:0;padding:.4rem 0;margin:.4rem 0;}
+
+/* v0.24.2: visible desktop/TV navigation in gutters outside the text frame. */
+html:not(.mushaf-has-touch) #panel-mushaf .mushaf-reading {
+  padding-left:44px;
+  padding-right:44px;
+}
+html:not(.mushaf-has-touch) #panel-mushaf .mushaf-tv-navigation {
+  left:2px;right:2px;
+}
+#panel-mushaf .mushaf-tv-navigation button {
+  display:grid;place-items:center;box-sizing:border-box;
+  width:40px;height:44px;padding:0;border:0;border-radius:6px;
+  background:transparent;color:#22744c;font:600 23px/1 system-ui,sans-serif;
+  transition:font-size .15s,background-color .15s;
+}
+#panel-mushaf .mushaf-tv-navigation button:hover,
+#panel-mushaf .mushaf-tv-navigation button:focus-visible {
+  font-size:29px;background:#e4eee7;color:#195a3a;
+  outline:2px solid #6f9d85;outline-offset:-2px;
+}
+#panel-mushaf .mushaf-tv-navigation button:disabled {opacity:.4;cursor:default;}
