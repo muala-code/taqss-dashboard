@@ -696,12 +696,12 @@ html:not(.mushaf-has-touch) #panel-mushaf .mushaf-tv-navigation {
 #panel-mushaf .mushaf-tv-navigation button {
   display:grid;place-items:center;box-sizing:border-box;
   width:40px;height:44px;padding:0;border:0;border-radius:6px;
-  background:transparent;color:#22744c;font:600 23px/1 system-ui,sans-serif;
+  background:transparent;color:#b3262e;font:600 23px/1 system-ui,sans-serif;
   transition:font-size .15s,background-color .15s;
 }
 #panel-mushaf .mushaf-tv-navigation button:hover,
 #panel-mushaf .mushaf-tv-navigation button:focus-visible {
-  font-size:29px;background:#e4eee7;color:#195a3a;
-  outline:2px solid #6f9d85;outline-offset:-2px;
+  font-size:29px;background:#fbeaec;color:#8e1821;
+  outline:2px solid #c6535b;outline-offset:-2px;
 }
 #panel-mushaf .mushaf-tv-navigation button:disabled {opacity:.4;cursor:default;}
