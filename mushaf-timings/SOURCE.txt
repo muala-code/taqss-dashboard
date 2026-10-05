@@ -1,3 +1,7 @@
 Word timing data: Colin P. Fair / cpfair/quran-align, release-2016-11-24.
 https://github.com/cpfair/quran-align
 CC BY 4.0. Matching EveryAyah recordings only. Some spans group words; missing/mismatched rows fall back to ayah highlighting.
+
+2026-10-05 additions: Abdul_Basit_Murattal_64kbps and Abdurrahmaan_As-Sudais_192kbps from the same licensed release.
+Audio folders match timing folders exactly. Rows incompatible with the displayed word count or segment bounds are omitted (227 Basit / 222 Sudais); these verses use ayah-level highlighting.
+These are automatically aligned source timings, not a claim of manual listening verification of every word.

@@ -645,6 +645,16 @@
   function buildMarketHeader(title) {
     const head = document.createElement("div"); head.className = "market-group-heading";
     const h = document.createElement("h3"); h.textContent = title; head.appendChild(h);
+    const wrap = document.createElement("span"); wrap.className = "info-wrap";
+    const button = document.createElement("button"); button.type = "button"; button.className = "info-button";
+    button.textContent = "ⓘ"; button.setAttribute("aria-label", "معلومات تأخر الأسعار"); button.setAttribute("aria-expanded", "false");
+    const bubble = document.createElement("span"); bubble.className = "info-bubble market-delay-info"; bubble.hidden = true;
+    bubble.textContent = "الأسعار قد تكون متأخرة؛ مدة التأخير بالدقائق غير محددة من المصدر.";
+    bubble.setAttribute("role", "status");
+    button.addEventListener("click", event => { event.stopPropagation(); bubble.hidden = !bubble.hidden; button.setAttribute("aria-expanded", String(!bubble.hidden)); });
+    wrap.addEventListener("keydown", event => { if (event.key === "Escape") { bubble.hidden = true; button.setAttribute("aria-expanded", "false"); button.focus(); } });
+    head.addEventListener("focusout", event => { if (!head.contains(event.relatedTarget)) { bubble.hidden = true; button.setAttribute("aria-expanded", "false"); } });
+    wrap.append(button, bubble); head.appendChild(wrap);
     return head;
   }
   function buildMarketDetails(q) {
@@ -922,15 +932,20 @@
     });
     dl?.querySelectorAll(".prayer-countdown").forEach(el => el.remove());
 
-    const nextPrayerRow = $(`#prayerData [data-prayer-key="${state.nextPrayerKey}"]`);
-    if (nextPrayerRow) {
-      nextPrayerRow.classList.add("next-prayer");
-      nextPrayerRow.setAttribute("aria-label", `${names[state.nextPrayerKey]}، الصلاة القادمة`);
-    }
-
-    const currentRow = $(`#prayerData [data-prayer-key="${state.currentKey}"]`);
-    if (!currentRow) return;
+    const focus = $("#prayerCurrent");
+    if (!focus) return;
+    focus.replaceChildren(); focus.hidden = true;
+    dl?.querySelectorAll("[data-prayer-key]").forEach(row => { row.hidden = false; });
+    // Sunrise remains a timetable entry, with no focused prayer until Dhuhr.
+    if (state.currentKey === "sunrise") return;
+    const sourceRow = $(`#prayerData [data-prayer-key="${state.currentKey}"]`);
+    if (!sourceRow) return;
+    const currentRow = sourceRow.cloneNode(true);
+    currentRow.hidden = false;
     currentRow.classList.add("current-period");
+    currentRow.setAttribute("aria-label", `الصلاة الحالية: ${names[state.currentKey]}`);
+    sourceRow.hidden = true;
+    focus.appendChild(currentRow); focus.hidden = false;
     const meter = document.createElement("span");
     meter.className = "prayer-countdown";
     if (state.ratio <= .10) meter.classList.add("is-danger");
@@ -969,6 +984,8 @@
     }
 
     dl.innerHTML=""; moonDl.innerHTML="";
+    const prayerFocus = $("#prayerCurrent");
+    if (prayerFocus) { prayerFocus.replaceChildren(); prayerFocus.hidden = true; }
     const now=new Date();
     dateSummary.textContent = `${riyadhWeekday(now)} · — · الموافق ${gregorianHyphenArabic(now)}`;
     try {

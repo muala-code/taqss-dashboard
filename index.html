@@ -7,7 +7,7 @@
   <title>طقس داشبورد</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌡️</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=0.24.2">
+  <link rel="stylesheet" href="styles.css?v=0.24.5">
   <link rel="stylesheet" href="mushaf.css?v=0.24.3">
 </head>
 <body>
@@ -117,7 +117,8 @@
       </div>
       <section class="simple-section prayer-section">
         <p id="prayerStatus" class="status">جارٍ جلب الأوقات…</p>
-        <dl id="prayerData" class="rows prayer-rows"></dl>
+        <dl id="prayerCurrent" class="rows prayer-current" aria-label="الصلاة الحالية" hidden></dl>
+        <dl id="prayerData" class="rows prayer-rows prayer-table"></dl>
       </section>
 
       <section class="simple-section moon-section">
@@ -229,9 +230,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="config.js?v=0.20.1"></script>
   <script src="markets-config.js?v=0.23.5"></script>
-  <script src="app.js?v=0.24.1"></script>
+  <script src="app.js?v=0.24.5"></script>
   <script src="radar.js?v=0.20.1"></script>
-  <script src="mushaf.js?v=0.24.3"></script>
+  <script src="mushaf.js?v=0.24.5"></script>
   <script src="quiz.js?v=0.24.2"></script>
 </body>
 </html>

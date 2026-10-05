@@ -414,15 +414,18 @@
   // that exact read+surah has official timing rows. No inferred timestamps.
   const RECITERS = [
     {wordTimed:true,id:'husary',name:'محمود خليل الحصري',folder:'Husary_64kbps'},
-    {id:'ayyub',name:'محمد أيوب',folder:'Muhammad_Ayyoub_128kbps'},
-    {id:'basit',name:'عبدالباسط عبدالصمد (مرتل)',folder:'Abdul_Basit_Murattal_192kbps'},
+    {wordTimed:true,id:'basit',name:'عبدالباسط عبدالصمد (مرتل)',folder:'Abdul_Basit_Murattal_64kbps'},
     {wordTimed:true,id:'minshawi',name:'محمد صديق المنشاوي (مرتل)',folder:'Minshawy_Murattal_128kbps'},
-    {id:'sudais',name:'عبدالرحمن السديس',folder:'Abdurrahmaan_As-Sudais_192kbps'},
+    {wordTimed:true,id:'sudais',name:'عبدالرحمن السديس',folder:'Abdurrahmaan_As-Sudais_192kbps'},
+    {id:'ayyub',name:'محمد أيوب',folder:'Muhammad_Ayyoub_128kbps'},
     {id:'maher',name:'ماهر المعيقلي',folder:'Maher_AlMuaiqly_64kbps'},
-    {id:'taleb',name:'أحمد بن طالب حميد',timed:true,pattern:/أحمد بن طالب|احمد بن طالب|أحمد طالب بن حميد|احمد طالب بن حميد|ahmad bin tal/i},
-    {id:'ali',name:'علي جابر',timed:true,pattern:/علي جابر|ali jab/i},
-    {id:'hudhaify',name:'علي الحذيفي',timed:true,pattern:/الحذيفي|huthaif|hudhaif/i},
-    {id:'akhdar',name:'إبراهيم الأخضر',timed:true,pattern:/الأخضر|الاخضر|akh[d]?ar/i}
+    {id:'ali',name:'علي جابر',timed:true,readId:76},
+    {id:'hudhaify',name:'علي الحذيفي',folder:'Hudhaify_128kbps'},
+    {id:'akhdar',name:'إبراهيم الأخضر',folder:'Ibrahim_Akhdar_64kbps'},
+    {id:'khayyat',name:'عبدالله خياط',timed:true,readId:61},
+    {id:'juhany',name:'عبدالله الجهني',folder:'Abdullaah_3awwaad_Al-Juhaynee_128kbps'},
+    {id:'ghamdi',name:'سعد الغامدي',folder:'Ghamadi_40kbps'},
+    {id:'ajmi',name:'أحمد العجمي',folder:'ahmed_ibn_ali_al_ajamy_128kbps'}
   ];
   const byId=id=>RECITERS.find(r=>r.id===id)||RECITERS[0];
   const verseURL=(r,s,a)=>`https://everyayah.com/data/${r.folder}/${String(s).padStart(3,'0')}${String(a).padStart(3,'0')}.mp3`;
@@ -431,10 +434,9 @@
   const timingCache=new Map(), preloaded=new Map();
   let timedCatalogPromise=null;
   async function getTimedCatalog(){
-    if(!timedCatalogPromise)timedCatalogPromise=Promise.all([
-      fetch('https://mp3quran.net/api/v3/ayat_timing/reads').then(r=>{if(!r.ok)throw Error('timed reads unavailable');return r.json();}),
-      fetch('https://mp3quran.net/api/v3/reciters?language=ar').then(r=>{if(!r.ok)throw Error('reciters unavailable');return r.json();})
-    ]).then(([reads,catalog])=>({reads:Array.isArray(reads)?reads:reads.reads||[],reciters:catalog.reciters||[]})).catch(()=>({reads:[],reciters:[]}));
+    if(!timedCatalogPromise)timedCatalogPromise=fetch('https://mp3quran.net/api/v3/ayat_timing/reads')
+      .then(r=>{if(!r.ok)throw Error('timed reads unavailable');return r.json();})
+      .then(reads=>({reads:Array.isArray(reads)?reads:reads.reads||[]})).catch(()=>{timedCatalogPromise=null;return {reads:[]};});
     return timedCatalogPromise;
   }
   async function timedTrack(reciter,surah){
@@ -442,11 +444,9 @@
     if(timingCache.has(key))return timingCache.get(key);
     const task=(async()=>{
       const data=await getTimedCatalog();
-      const match=data.reads.find(r=>reciter.pattern.test(r.name||'')&&(!r.rewaya||/حفص/.test(r.rewaya)));
+      const match=data.reads.find(r=>Number(r.id)===reciter.readId&&/حفص/.test(r.rewaya||''));
       if(!match)return null;
-      const catalog=data.reciters.find(c=>reciter.pattern.test(c.name||''));
-      const candidate=catalog?.moshaf?.find(m=>Number(m.id)===Number(match.id));
-      const server=match.folder_url||candidate?.server;
+      const server=match.folder_url;
       if(!server?.startsWith('https://')&&!server?.startsWith('http://'))return null;
       const rows=await fetch(`https://mp3quran.net/api/v3/ayat_timing?surah=${surah}&read=${match.id}`)
         .then(r=>{if(!r.ok)throw Error('timings unavailable');return r.json();});
@@ -454,11 +454,12 @@
       if(!Array.isArray(rows)||!count)return null;
       const times=rows.filter(t=>t.ayah>0&&Number.isFinite(Number(t.start_time))&&Number.isFinite(Number(t.end_time)))
         .sort((a,b)=>a.ayah-b.ayah);
-      if(times.length!==count||times.some((t,i)=>t.ayah!==i+1||Number(t.end_time)<=Number(t.start_time)))return null;
+      if(times.length!==count||times.some((t,i)=>Number(t.ayah)!==i+1||Number(t.start_time)<0||Number(t.end_time)<=Number(t.start_time)||(i>0&&Number(t.start_time)<Number(times[i-1].end_time))))return null;
       return {type:'timed',url:`${server.replace(/\/$/,'')}/${String(surah).padStart(3,'0')}.mp3`,
         times:times.map(t=>({start:Number(t.start_time)/1000,end:Number(t.end_time)/1000}))};
     })().catch(()=>null);
-    timingCache.set(key,task);return task;
+    timingCache.set(key,task);
+    task.then(track=>{if(!track)timingCache.delete(key);});return task;
   }
   // Non-blocking transient notice. A terminal failure stays visible, but
   // successful reader fallback disappears after three seconds.
@@ -611,7 +612,8 @@
           a.addEventListener('loadedmetadata',ok,{once:true});a.addEventListener('error',bad,{once:true});a.load();
         });
         if(token!==state.audioToken)return;
-        a.currentTime=track.times[ayah-1].start;
+        if(!Number.isFinite(a.duration)||track.times[track.times.length-1].end>a.duration+.5)throw Error('Audio and timing duration mismatch');
+        a.currentTime=ayah===1&&surah!==9?0:track.times[ayah-1].start;
         await a.play();
       }
       if(token!==state.audioToken){a.pause();return;}
@@ -675,7 +677,7 @@
       const track=state.audioTrack;
       if(state.mode!=='listen'||state.audioKind!=='timed'||!track||timedTransition||a.paused)return;
       const end=track.times[state.audioAyah-1]?.end;
-      if(Number.isFinite(end)&&a.currentTime>=end-.07){
+      if(Number.isFinite(end)&&a.currentTime>=end){
         timedTransition=true;
         const nxt=nextAudioVerse(state.audioSurah,state.audioAyah);
         // With a single timed surah file, repeat by seeking to the current ayah.
@@ -683,7 +685,7 @@
         if(state.repeat>0&&state.repeatPlayed<state.repeat){
           a.currentTime=track.times[state.audioAyah-1].start;
         }else if(nxt&&nxt.surah===state.audioSurah){
-          state.repeatPlayed=0;showAudioVerse(nxt.surah,nxt.ayah);a.currentTime=track.times[nxt.ayah-1].start;
+          state.repeatPlayed=0;showAudioVerse(nxt.surah,nxt.ayah);
         }else{
           // advanceAudio counts a completed playback; avoid double-counting.
           state.repeatPlayed=state.repeat?state.repeat-1:0;
@@ -726,7 +728,30 @@
   function setupFullscreen(){
     const reading=$('#mushafReading'),button=$('#mushafFullscreenButton');
     const active=()=>document.fullscreenElement===reading||reading.classList.contains('is-mushaf-fullscreen');
-    function sync(){const full=active();button.setAttribute('aria-pressed',String(full));button.title=full?'الخروج من ملء الشاشة':'ملء الشاشة';button.firstChild.textContent=full?'⤢ ':'⛶ ';button.querySelector('span').textContent=full?'تصغير':'ملء الشاشة';scheduleRender();}
+    let screenLock=null,lockPending=false,pageSuspended=false;
+    const mobile=navigator.userAgentData?.mobile===true||(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)&&navigator.maxTouchPoints>0);
+    const wantsScreen=()=>mobile&&!pageSuspended&&active()&&!$('#panel-mushaf').hidden&&document.visibilityState==='visible';
+    async function syncScreenLock(){
+      if(!navigator.wakeLock)return;
+      if(!wantsScreen()){
+        const held=screenLock;screenLock=null;
+        if(held)try{await held.release();}catch{}
+        return;
+      }
+      if(screenLock&&!screenLock.released||lockPending)return;
+      lockPending=true;
+      try{
+        const held=await navigator.wakeLock.request('screen');
+        if(!wantsScreen()){await held.release();return;}
+        screenLock=held;
+        held.addEventListener('release',()=>{if(screenLock===held)screenLock=null;},{once:true});
+      }catch{}finally{lockPending=false;}
+    }
+    document.addEventListener('visibilitychange',syncScreenLock);
+    document.addEventListener('taqss:tab-change',syncScreenLock);
+    window.addEventListener('pagehide',()=>{pageSuspended=true;syncScreenLock();});
+    window.addEventListener('pageshow',()=>{pageSuspended=false;syncScreenLock();});
+    function sync(){const full=active();syncScreenLock();button.setAttribute('aria-pressed',String(full));button.title=full?'الخروج من ملء الشاشة':'ملء الشاشة';button.firstChild.textContent=full?'⤢ ':'⛶ ';button.querySelector('span').textContent=full?'تصغير':'ملء الشاشة';scheduleRender();}
     button.addEventListener('click',async()=>{
       if(active()){
         if(document.fullscreenElement===reading&&document.exitFullscreen)try{await document.exitFullscreen();}catch{}
