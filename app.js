@@ -741,8 +741,8 @@
         if(!paused&&!document.hidden&&!$('#panel-markets').hidden&&!drag){
           // Accumulate fractions: high-refresh screens can round each small
           // scrollLeft assignment to zero if it is added to the rounded value.
-          autoPosition+=Math.min(now-last||0,50)*.035;
-          if(autoPosition>width*1.5)autoPosition-=width;
+          autoPosition-=Math.min(now-last||0,50)*.035;
+          if(autoPosition<width*.5)autoPosition+=width;
           viewport.scrollLeft=autoPosition;
         }
       }

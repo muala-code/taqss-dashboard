@@ -738,3 +738,22 @@ html:not(.mushaf-has-touch) #panel-mushaf .mushaf-tv-navigation {
 
 .mushaf-size-controls {flex-wrap:wrap;gap:.6rem;}
 .mushaf-timing-source {font:.7rem/1.6 system-ui,sans-serif;margin:.5rem 0;}
+
+/* v0.24.6.3: small, uniform colored SVG controls on every screen. */
+#panel-mushaf .mushaf-reading-header {
+  height:32px!important;min-height:32px!important;padding:.05rem .25rem!important;
+  grid-template-columns:28px 28px minmax(0,1fr) clamp(10px,3vw,32px) minmax(0,.8fr) 28px 28px!important;
+}
+#panel-mushaf .mushaf-reading-header button {
+  width:28px;height:28px;min-width:28px;min-height:28px;padding:0;gap:0;
+  display:inline-flex;align-items:center;justify-content:center;
+}
+#panel-mushaf .mushaf-reading-header button span {display:none!important;}
+#panel-mushaf .mushaf-toolbar-icon {display:block;width:18px;height:18px;flex:0 0 18px;}
+#panel-mushaf #mushafIndexButton {color:#3979a9;}
+#panel-mushaf #mushafReadButton {color:#248150;}
+#panel-mushaf #mushafListenButton {color:#8253a2;}
+#panel-mushaf #mushafFullscreenButton {color:#25828c;}
+#panel-mushaf .mushaf-collapse-icon {display:none;}
+#panel-mushaf #mushafFullscreenButton[aria-pressed="true"] .mushaf-expand-icon {display:none;}
+#panel-mushaf #mushafFullscreenButton[aria-pressed="true"] .mushaf-collapse-icon {display:inline;}

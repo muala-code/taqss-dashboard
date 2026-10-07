@@ -769,7 +769,7 @@
     document.addEventListener('taqss:tab-change',syncScreenLock);
     window.addEventListener('pagehide',()=>{pageSuspended=true;syncScreenLock();});
     window.addEventListener('pageshow',()=>{pageSuspended=false;syncScreenLock();});
-    function sync(){const full=active();syncScreenLock();button.setAttribute('aria-pressed',String(full));button.title=full?'الخروج من ملء الشاشة':'ملء الشاشة';button.firstChild.textContent=full?'⤢ ':'⛶ ';button.querySelector('span').textContent=full?'تصغير':'ملء الشاشة';scheduleRender();}
+    function sync(){const full=active();syncScreenLock();button.setAttribute('aria-pressed',String(full));button.title=full?'الخروج من ملء الشاشة':'ملء الشاشة';button.setAttribute('aria-label',full?'الخروج من ملء الشاشة':'ملء شاشة القراءة');button.querySelector('span').textContent=full?'تصغير':'ملء الشاشة';scheduleRender();}
     button.addEventListener('click',async()=>{
       if(active()){
         if(document.fullscreenElement===reading&&document.exitFullscreen)try{await document.exitFullscreen();}catch{}
