@@ -689,12 +689,13 @@
   let tickerController=null;
   function buildIndexTicker(indices, bySymbol) {
     const prior=tickerController?.position()||0;
+    let paused=tickerController?.paused()||false;
     tickerController?.dispose();
     const area=document.createElement("section");area.className="index-ticker";
     area.setAttribute("aria-label","المؤشرات والسلع والمعادن");
     const label=document.createElement("strong");label.className="index-ticker-label";label.textContent="مؤشرات:";
     const viewport=document.createElement("div");viewport.className="index-ticker-viewport";viewport.tabIndex=0;
-    viewport.setAttribute("aria-label","شريط المؤشرات؛ اسحب في الاتجاهين أو استخدم الأسهم");
+    viewport.setAttribute("aria-label","شريط المؤشرات؛ انقر لإيقاف الحركة واسحب في الاتجاهين، وانقر خارجه لاستئناف الحركة");
     const track=document.createElement("div");track.className="index-ticker-track";
     for(let copy=0;copy<3;copy++){
       const set=document.createElement("div");set.className="index-ticker-set";
@@ -710,17 +711,14 @@
       track.append(set);
     }
     viewport.append(track);area.append(label,viewport);
-    let frame=null,last=0,width=0,pauseUntil=0,drag=null,hover=false,disposed=false,autoOffset=null;
-    const motion=matchMedia('(prefers-reduced-motion: reduce)');
-    const pause=()=>{pauseUntil=performance.now()+3500;};
+    let frame=null,last=0,width=0,drag=null,disposed=false,autoPosition=0;
+    const pause=()=>{paused=true;};
     const wrap=()=>{if(width>0){while(viewport.scrollLeft<width*.5)viewport.scrollLeft+=width;while(viewport.scrollLeft>width*1.5)viewport.scrollLeft-=width;}};
     const step=amount=>{pause();viewport.scrollLeft+=amount;wrap();};
-    for(const [arrow,amount,title] of [['‹',-180,'تحريك الشريط إلى اليسار'],['›',180,'تحريك الشريط إلى اليمين']]){
-      const button=document.createElement('button');button.type='button';button.className='index-ticker-arrow';button.textContent=arrow;button.setAttribute('aria-label',title);button.title=title;
-      button.addEventListener('click',()=>step(amount));area.append(button);
-    }
-    viewport.addEventListener('pointerenter',()=>{hover=true;});
-    viewport.addEventListener('pointerleave',()=>{hover=false;});
+    area.addEventListener('click',pause);
+    const outside=event=>{if(!area.contains(event.target)){paused=false;drag=null;autoPosition=viewport.scrollLeft;last=performance.now();}};
+    document.addEventListener('pointerdown',outside);
+    document.addEventListener('click',outside);
     viewport.addEventListener('pointerdown',event=>{
       pause();if(event.pointerType!=='mouse'||event.button!==0)return;
       drag={id:event.pointerId,x:event.clientX,offset:viewport.scrollLeft};viewport.setPointerCapture(event.pointerId);viewport.classList.add('is-dragging');
@@ -730,7 +728,6 @@
     viewport.addEventListener('pointerup',release);viewport.addEventListener('pointercancel',release);
     viewport.addEventListener('touchstart',event=>{event.stopPropagation();pause();},{passive:true});
     viewport.addEventListener('touchend',event=>{event.stopPropagation();pause();},{passive:true});
-    viewport.addEventListener('scroll',()=>{if(autoOffset===null||Math.abs(viewport.scrollLeft-autoOffset)>=2)pause();},{passive:true});
     viewport.addEventListener('wheel',event=>{if(event.deltaX||event.shiftKey){event.preventDefault();step(event.deltaX||event.deltaY);}},{passive:false});
     viewport.addEventListener('keydown',event=>{
       if(['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();event.stopPropagation();step(event.key==='ArrowLeft'?-180:180);}
@@ -739,15 +736,19 @@
       if(disposed)return;
       if(area.isConnected&&viewport.clientWidth&&track.firstElementChild.offsetWidth){
         const newWidth=track.firstElementChild.offsetWidth;
-        if(!width){width=newWidth;viewport.scrollLeft=width+Math.min(prior,width-1);autoOffset=viewport.scrollLeft;}
-        else if(width!==newWidth){const offset=viewport.scrollLeft-width;width=newWidth;viewport.scrollLeft=width+offset;}
-        if(!motion.matches&&!document.hidden&&!$('#panel-markets').hidden&&!drag&&!hover&&!area.contains(document.activeElement)&&now>pauseUntil){
-          viewport.scrollLeft+=Math.min(now-last||0,50)*.035;wrap();autoOffset=viewport.scrollLeft;
+        if(!width){width=newWidth;viewport.scrollLeft=width+Math.min(prior,width-1);wrap();autoPosition=viewport.scrollLeft;}
+        else if(width!==newWidth){const offset=viewport.scrollLeft-width;width=newWidth;viewport.scrollLeft=width+offset;autoPosition=viewport.scrollLeft;}
+        if(!paused&&!document.hidden&&!$('#panel-markets').hidden&&!drag){
+          // Accumulate fractions: high-refresh screens can round each small
+          // scrollLeft assignment to zero if it is added to the rounded value.
+          autoPosition+=Math.min(now-last||0,50)*.035;
+          if(autoPosition>width*1.5)autoPosition-=width;
+          viewport.scrollLeft=autoPosition;
         }
       }
       last=now;frame=requestAnimationFrame(tick);
     };
-    tickerController={position:()=>width?((viewport.scrollLeft-width)%width+width)%width:prior,dispose:()=>{disposed=true;cancelAnimationFrame(frame);}};
+    tickerController={paused:()=>paused,position:()=>width?((viewport.scrollLeft-width)%width+width)%width:prior,dispose:()=>{disposed=true;cancelAnimationFrame(frame);document.removeEventListener('pointerdown',outside);document.removeEventListener('click',outside);}};
     frame=requestAnimationFrame(tick);return area;
   }
 
@@ -781,7 +782,7 @@
             row.innerHTML = `<span class="market-name">${item.name}</span><span class="num market-index-value ${cls}">${fmt(q.price,2)}</span><span class="num ${cls}">${pct === null ? "—" : marketSigned(pct,"%")}</span>`;
           } else {
             // Three columns only: name | last price | colored percent.
-            row.innerHTML = `<span class="market-name">${item.name}</span><span class="num">${marketFixed(q.price)}</span><span class="num ${cls}">${pct === null ? "—" : marketSigned(pct,"%")}</span>`;
+            row.innerHTML = `<span class="market-name">${item.name}</span><span class="num ${cls}">${marketFixed(q.price)}</span><span class="num ${cls}">${pct === null ? "—" : marketSigned(pct,"%")}</span>`;
             if (key === "stock" || key === "commodity") {
               row.classList.add("stock-row", "market-expandable-row");
               row.tabIndex = 0; row.setAttribute("role", "button");
