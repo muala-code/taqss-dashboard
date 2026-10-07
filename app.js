@@ -686,47 +686,69 @@
     if (n !== null) previousMarketPrices.set(symbol, n);
   }
 
+  let tickerController=null;
   function buildIndexTicker(indices, bySymbol) {
-    const area = document.createElement("section");
-    area.className = "index-ticker";
-    area.setAttribute("aria-label", "المؤشرات والسلع والمعادن");
-    const viewport = document.createElement("div");
-    viewport.className = "index-ticker-viewport";
-    viewport.tabIndex = 0;
-    viewport.setAttribute("aria-label", "المؤشرات والسلع والمعادن، شريط متحرك يتوقف عند تمرير المؤشر أو التركيز عليه");
-    const track = document.createElement("div");
-    track.className = "index-ticker-track";
-    const createSet = (duplicate = false) => {
-      const set = document.createElement("div");
-      set.className = "index-ticker-set";
-      if (duplicate) set.setAttribute("aria-hidden", "true");
-      // Repeat to fill even a wide landscape viewport without an empty interval.
-      for (let cycle = 0; cycle < 3; cycle++) {
-        for (const item of indices) {
-          const q = bySymbol.get(item.symbol) || {};
-          const direction = marketDirection(q);
-          const pct = finite(q.changePercent);
-          const segment = document.createElement("span");
-          segment.className = "index-ticker-item";
-          if (cycle > 0) segment.setAttribute("aria-hidden", "true");
-          const name = document.createElement("strong");
-          name.textContent = item.name;
-          const price = document.createElement("span");
-          price.className = `index-ticker-value ${direction}`;
-          price.textContent = fmt(q.price, 2);
-          const change = document.createElement("span");
-          change.className = `index-ticker-change ${direction}`;
-          change.textContent = pct === null ? "—" : marketSigned(pct, "%");
-          segment.append(name, price, change);
-          set.appendChild(segment);
+    const prior=tickerController?.position()||0;
+    tickerController?.dispose();
+    const area=document.createElement("section");area.className="index-ticker";
+    area.setAttribute("aria-label","المؤشرات والسلع والمعادن");
+    const label=document.createElement("strong");label.className="index-ticker-label";label.textContent="مؤشرات:";
+    const viewport=document.createElement("div");viewport.className="index-ticker-viewport";viewport.tabIndex=0;
+    viewport.setAttribute("aria-label","شريط المؤشرات؛ اسحب في الاتجاهين أو استخدم الأسهم");
+    const track=document.createElement("div");track.className="index-ticker-track";
+    for(let copy=0;copy<3;copy++){
+      const set=document.createElement("div");set.className="index-ticker-set";
+      if(copy!==1)set.setAttribute("aria-hidden","true");
+      for(const item of [...indices].reverse()){
+        const q=bySymbol.get(item.symbol)||{}, direction=marketDirection(q), pct=finite(q.changePercent);
+        const segment=document.createElement("span");segment.className="index-ticker-item";
+        const name=document.createElement("strong");name.textContent=item.name;
+        const price=document.createElement("span");price.className=`index-ticker-value ${direction}`;price.textContent=fmt(q.price,2);
+        const change=document.createElement("span");change.className=`index-ticker-change ${direction}`;change.textContent=pct===null?"—":marketSigned(pct,"%");
+        segment.append(name,price,change);set.append(segment);
+      }
+      track.append(set);
+    }
+    viewport.append(track);area.append(label,viewport);
+    let frame=null,last=0,width=0,pauseUntil=0,drag=null,hover=false,disposed=false,autoOffset=null;
+    const motion=matchMedia('(prefers-reduced-motion: reduce)');
+    const pause=()=>{pauseUntil=performance.now()+3500;};
+    const wrap=()=>{if(width>0){while(viewport.scrollLeft<width*.5)viewport.scrollLeft+=width;while(viewport.scrollLeft>width*1.5)viewport.scrollLeft-=width;}};
+    const step=amount=>{pause();viewport.scrollLeft+=amount;wrap();};
+    for(const [arrow,amount,title] of [['‹',-180,'تحريك الشريط إلى اليسار'],['›',180,'تحريك الشريط إلى اليمين']]){
+      const button=document.createElement('button');button.type='button';button.className='index-ticker-arrow';button.textContent=arrow;button.setAttribute('aria-label',title);button.title=title;
+      button.addEventListener('click',()=>step(amount));area.append(button);
+    }
+    viewport.addEventListener('pointerenter',()=>{hover=true;});
+    viewport.addEventListener('pointerleave',()=>{hover=false;});
+    viewport.addEventListener('pointerdown',event=>{
+      pause();if(event.pointerType!=='mouse'||event.button!==0)return;
+      drag={id:event.pointerId,x:event.clientX,offset:viewport.scrollLeft};viewport.setPointerCapture(event.pointerId);viewport.classList.add('is-dragging');
+    });
+    viewport.addEventListener('pointermove',event=>{if(drag){viewport.scrollLeft=drag.offset+drag.x-event.clientX;pause();}});
+    const release=()=>{drag=null;viewport.classList.remove('is-dragging');wrap();pause();};
+    viewport.addEventListener('pointerup',release);viewport.addEventListener('pointercancel',release);
+    viewport.addEventListener('touchstart',event=>{event.stopPropagation();pause();},{passive:true});
+    viewport.addEventListener('touchend',event=>{event.stopPropagation();pause();},{passive:true});
+    viewport.addEventListener('scroll',()=>{if(autoOffset===null||Math.abs(viewport.scrollLeft-autoOffset)>=2)pause();},{passive:true});
+    viewport.addEventListener('wheel',event=>{if(event.deltaX||event.shiftKey){event.preventDefault();step(event.deltaX||event.deltaY);}},{passive:false});
+    viewport.addEventListener('keydown',event=>{
+      if(['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();event.stopPropagation();step(event.key==='ArrowLeft'?-180:180);}
+    });
+    const tick=now=>{
+      if(disposed)return;
+      if(area.isConnected&&viewport.clientWidth&&track.firstElementChild.offsetWidth){
+        const newWidth=track.firstElementChild.offsetWidth;
+        if(!width){width=newWidth;viewport.scrollLeft=width+Math.min(prior,width-1);autoOffset=viewport.scrollLeft;}
+        else if(width!==newWidth){const offset=viewport.scrollLeft-width;width=newWidth;viewport.scrollLeft=width+offset;}
+        if(!motion.matches&&!document.hidden&&!$('#panel-markets').hidden&&!drag&&!hover&&!area.contains(document.activeElement)&&now>pauseUntil){
+          viewport.scrollLeft+=Math.min(now-last||0,50)*.035;wrap();autoOffset=viewport.scrollLeft;
         }
       }
-      return set;
+      last=now;frame=requestAnimationFrame(tick);
     };
-    track.append(createSet(), createSet(true));
-    viewport.appendChild(track);
-    area.appendChild(viewport);
-    return area;
+    tickerController={position:()=>width?((viewport.scrollLeft-width)%width+width)%width:prior,dispose:()=>{disposed=true;cancelAnimationFrame(frame);}};
+    frame=requestAnimationFrame(tick);return area;
   }
 
   async function loadMarkets({silent=false} = {}) {

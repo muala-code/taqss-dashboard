@@ -6,7 +6,7 @@
   const STORAGE_KEY = 'taqss.mushaf.v0214.settings';
   const PLACE_KEY = 'taqss.mushaf.v0214.place';
   const state = {
-    rows: [], names: [], surahs: new Map(), mode: 'read',
+    rows: [], names: [], surahs: new Map(), mode: 'read', showFrame: true, audioLoading: false,
     cursor: {surah: 1, ayah: 1, token: 0}, selected: null, history: [],
     nextCursor: null, lastSave: null, ready: false, layoutScheduled: false,
     modalOpen: false, touch: null, rendering: false, fontSize: 'medium', font: 'majma', audioAyah: 1, audioSurah: 1, audioToken: 0, reciter: "husary", repeat: 0, repeatPlayed: 0, audioKind: "verse", audioTrack: null, lastGood: null, audioFallbacks: new Set(), audioFailures: 0, audioSelectionPending: false, continuousBuilt: false, pendingScroll: false, scrollTimer: null, programmaticScrollUntil: 0
@@ -16,7 +16,7 @@
   const fmt = number => Number(number).toLocaleString('ar-SA');
   function setStatus(message) {const el=$('#mushafLoadStatus'); el.textContent=message; el.hidden=!message;}
   function saved(key, fallback){try{return JSON.parse(localStorage.getItem(key)) ?? fallback;}catch{return fallback;}}
-  function saveSettings(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({mode:state.mode,fontSize:state.fontSize,font:state.font,surah:state.cursor.surah,ayah:state.cursor.ayah,token:state.cursor.token||0,reciter:state.reciter,repeat:state.repeat}));}catch{}}
+  function saveSettings(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({mode:state.mode,showFrame:state.showFrame,fontSize:state.fontSize,font:state.font,surah:state.cursor.surah,ayah:state.cursor.ayah,token:state.cursor.token||0,reciter:state.reciter,repeat:state.repeat}));}catch{}}
   function verseAt(c){return state.surahs.get(c.surah)?.[c.ayah-1] || null;}
   function validCursor(c){
     const s=Number(c?.surah), a=Number(c?.ayah), token=Number(c?.token||0);
@@ -351,8 +351,9 @@
       menu.setAttribute('role','listbox');menu.setAttribute('aria-label',button.getAttribute('aria-label'));menu.hidden=true;
       button.setAttribute('aria-controls',menu.id);wrap.append(button,menu);
       const close=()=>{menu.hidden=true;button.setAttribute('aria-expanded','false');};
-      const sync=()=>{button.textContent=(select.selectedOptions[0]?.textContent||'—')+' ▾';};
+      const sync=()=>{button.disabled=select.disabled;button.textContent=(select.selectedOptions[0]?.textContent||'—')+' ▾';};
       const open=()=>{
+        if(select.disabled)return;
         pickers.forEach(p=>p.close());menu.replaceChildren();
         Array.from(select.options).forEach(option=>{
           const item=document.createElement('button');item.type='button';item.textContent=option.textContent;
@@ -374,7 +375,7 @@
         }
       });
       document.addEventListener('click',event=>{if(!wrap.contains(event.target))close();});
-      select.addEventListener('change',sync);new MutationObserver(sync).observe(select,{childList:true,subtree:true});
+      select.addEventListener('change',sync);new MutationObserver(sync).observe(select,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled']});
       pickers.push({sync,close});sync();
     });
   }
@@ -384,7 +385,6 @@
     const focusFrom=document.activeElement;state.returnFocus=focusFrom;
     $('#mushafSurah').value=String(state.cursor.surah);
     refreshAyahOptions(state.cursor.surah,state.cursor.ayah);
-    $('#mushafDisplayMode').value=state.mode;
     $('#mushafFontChoice').value=state.font;
     syncPickers();
     $('#mushafActionStatus').hidden=true;
@@ -399,9 +399,12 @@
     (state.returnFocus||$('#mushafIndexButton')).focus();
   }
   function setMode(mode){
-    state.mode=mode==='listen'?'listen':'read';
+    const nextMode=mode==='listen'?'listen':'read';
+    if(state.mode===nextMode&&state.modeInitialized)return;
+    state.modeInitialized=true;state.mode=nextMode;
     const listen=state.mode==='listen';
-    $('#mushafDisplayMode').value=state.mode;
+    $('#mushafReadButton').setAttribute('aria-pressed',String(!listen));
+    $('#mushafListenButton').setAttribute('aria-pressed',String(listen));
     $('#mushafListening').hidden=!listen;
     $('#mushafReading').classList.toggle('mushaf-listening-mode',listen);
     $('#mushafReading').classList.toggle('mushaf-text-mode',listen);
@@ -511,11 +514,15 @@
   }
   function syncAudioHighlight(){
     document.querySelectorAll('#mushafVerses .mushaf-verse').forEach(node=>{
-      node.classList.toggle('is-playing',state.mode==='listen'&&node.dataset.verse===`${state.audioSurah}:${state.audioAyah}`);
+      node.classList.toggle('is-playing',state.mode==='listen'&&state.audioKind!=='basmala'&&node.dataset.verse===`${state.audioSurah}:${state.audioAyah}`);
     });
+    document.querySelectorAll('#mushafVerses .mushaf-basmala').forEach(node=>node.classList.toggle('is-playing',state.mode==='listen'&&state.audioKind==='basmala'));
   }
   function syncAudioUI(){
     const playing=!audio().paused;
+    $('#mushafReciter').disabled=playing||state.audioLoading;
+    const picker=$('#mushafReciterButton');
+    if(picker)picker.disabled=playing||state.audioLoading;
     const count=state.surahs.get(state.audioSurah)?.length||0;
     $('#mushafAudioPrev').disabled=!state.ready||(state.audioSurah===1&&state.audioAyah===1);
     $('#mushafAudioNext').disabled=!state.ready||(state.audioSurah===114&&state.audioAyah===count);
@@ -530,7 +537,7 @@
   function stopAudio(){
     ++wordTimingToken;currentWordTimings=null;$('#mushafVerses').classList.remove('has-word-timing');
     $('#mushafVerses').querySelectorAll('.is-speaking').forEach(n=>n.classList.remove('is-speaking'));
-    ++state.audioToken;const a=audio();a.pause();a.removeAttribute('src');a.load();
+    ++state.audioToken;state.audioLoading=false;const a=audio();a.pause();a.removeAttribute('src');a.load();
     state.audioTrack=null;state.audioFailures=0;state.audioFallbacks.clear();state.repeatPlayed=0;syncAudioUI();
   }
   function showAudioVerse(surah,ayah){
@@ -581,10 +588,10 @@
     audioNotice(`تعذر الصوت؛ محاولة الاستمرار مع ${byId(alternative).name} من الآية نفسها…`);
     await playVerse(surah,ayah,true);
   }
-  async function playVerse(surah,ayah,isFallback=false,preserveRepeat=false){
+  async function playVerse(surah,ayah,isFallback=false,preserveRepeat=false,skipBasmala=false){
     state.audioSelectionPending=false;
     if(state.mode!=='listen'||!state.ready||!state.surahs.get(surah)?.[ayah-1])return;
-    const token=++state.audioToken;
+    const token=++state.audioToken;state.audioLoading=true;
     if(!preserveRepeat)state.repeatPlayed=0;
     ++wordTimingToken;currentWordTimings=null;$('#mushafVerses').classList.remove('has-word-timing');
     $('#mushafVerses').querySelectorAll('.is-speaking').forEach(n=>n.classList.remove('is-speaking'));
@@ -594,8 +601,12 @@
     audioNotice(`جارٍ تجهيز صوت ${r.name}…`);
     try{
       if(r.folder){
-        state.audioKind='verse';a.src=verseURL(r,surah,ayah);
-        loadWordTimings(r,surah,ayah);
+        // EveryAyah's numbered ayah streams are kept intact. The separate
+        // Fatiha basmala has its own media clock, so word timings stay unchanged.
+        const intro=ayah===1&&surah!==1&&surah!==9&&!preserveRepeat&&!skipBasmala;
+        state.audioKind=intro?'basmala':'verse';a.src=intro?verseURL(r,1,1):verseURL(r,surah,ayah);
+        if(!intro)loadWordTimings(r,surah,ayah);
+        syncAudioHighlight();
         preloadVerses(r,surah,ayah);
         await a.play();
       }else{
@@ -616,12 +627,13 @@
         a.currentTime=ayah===1&&surah!==9?0:track.times[ayah-1].start;
         await a.play();
       }
-      if(token!==state.audioToken){a.pause();return;}
+      if(token!==state.audioToken)return;
+      state.audioLoading=false;
       audioNotice(isFallback?`تم الانتقال إلى ${r.name} لاستمرار التلاوة.`:`القارئ: ${r.name}`);
       syncAudioUI();
     }catch(e){
       if(token!==state.audioToken)return;
-      a.pause();await failAndFallback(surah,ayah,token);
+      state.audioLoading=false;a.pause();await failAndFallback(surah,ayah,token);
     }
   }
   function advanceAudio(){
@@ -637,7 +649,10 @@
     const a=audio();const choice=$('#mushafReciter');
     for(const r of RECITERS){const option=document.createElement('option');option.value=r.id;option.textContent=r.name+(r.timed?' · تجريبي':'');choice.append(option);}
     choice.addEventListener('change',()=>{
-      stopAudio();state.reciter=choice.value;saveSettings();
+      if(!a.paused||state.audioLoading){choice.value=state.reciter;syncPickers();return;}
+      const nextReciter=choice.value;
+      const position={surah:state.audioSurah,ayah:state.audioAyah};
+      stopAudio();state.reciter=nextReciter;state.selected=position;state.audioSelectionPending=true;saveSettings();
       audioNotice('اختر تشغيل للاستماع إلى القارئ الجديد.');
     });
     $('#mushafRepeatAyah').addEventListener('click',()=>{
@@ -664,6 +679,9 @@
     });
     a.addEventListener('ended',()=>{
       if(state.mode!=='listen')return;
+      if(state.audioKind==='basmala'){
+        playVerse(state.audioSurah,state.audioAyah,false,true,true);return;
+      }
       // A timed surah that ends before expected time is not silently skipped.
       if(state.audioKind==='timed'&&state.audioAyah<(state.surahs.get(state.audioSurah)?.length||0)){
         audioNotice('انتهى الملف قبل اكتمال التوقيتات؛ يُجرَّب قارئ بديل.');
@@ -817,6 +835,16 @@
     });
     // Index choices are drafts until the form is submitted.
     $('#mushafIndexButton').addEventListener('click',openIndex);
+    $('#mushafReadButton').addEventListener('click',()=>setMode('read'));
+    $('#mushafListenButton').addEventListener('click',()=>setMode('listen'));
+    state.showFrame=settings.showFrame!==false;
+    const applyFrame=()=>{
+      $('#mushafShowFrame').checked=state.showFrame;
+      $('#panel-mushaf').classList.toggle('mushaf-no-frame',!state.showFrame);
+      state.history=[];scheduleRender();
+    };
+    applyFrame();
+    $('#mushafShowFrame').addEventListener('change',event=>{state.showFrame=event.target.checked;applyFrame();saveSettings();});
     $('#mushafIndexClose').addEventListener('click',closeIndex);
     $('#mushafIndexCancel').addEventListener('click',closeIndex);
     $('#mushafIndexOverlay').addEventListener('click',event=>{if(event.target.id==='mushafIndexOverlay')closeIndex();});
@@ -835,8 +863,8 @@
       event.preventDefault();
       const s=Number($('#mushafSurah').value),a=Number($('#mushafAyah').value);
       if(!state.surahs.get(s)?.[a-1])return;
-      const mode=$('#mushafDisplayMode').value,font=$('#mushafFontChoice').value;
-      stopAudio();applyFont(font);setMode(mode);
+      const font=$('#mushafFontChoice').value;
+      stopAudio();applyFont(font);
       closeIndex();goTo(s,a);saveSettings();
     });
     $('#mushafSavePlace').addEventListener('click',()=>{

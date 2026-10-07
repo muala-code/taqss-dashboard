@@ -685,6 +685,27 @@ html:not(.mushaf-has-touch) #panel-mushaf .mushaf-tv-navigation {
 #panel-mushaf .mushaf-verses {font-size:calc(var(--mushaf-type-size) * var(--mushaf-size-factor)) !important;}
 .mushaf-size-controls {display:flex;gap:1rem;border:0;padding:.4rem 0;margin:.4rem 0;}
 
+/* v0.24.6: direct reading/listening controls and optional text frame. */
+#panel-mushaf .mushaf-reading-header {
+  grid-template-columns:34px 34px minmax(0,1fr) clamp(10px,3vw,32px) minmax(0,.8fr) 34px 34px!important;
+  grid-template-areas:"fullscreen listen surah gap juz read index";
+  gap:.2rem!important;
+}
+#panel-mushaf .mushaf-header-mode {position:static;display:inline-flex;align-items:center;justify-content:center;gap:.25rem;min-width:32px;min-height:34px;padding:.25rem;border:1px solid transparent;border-radius:.35rem;background:transparent;color:#22744c;font:inherit;font-size:1.1rem;cursor:pointer;}
+#panel-mushaf .mushaf-read-button {grid-area:read;}
+#panel-mushaf .mushaf-listen-button {grid-area:listen;}
+#panel-mushaf .mushaf-header-mode[aria-pressed="true"] {background:color-mix(in srgb,#258a74 16%,Canvas);border-color:#6f9d85;}
+#panel-mushaf .mushaf-header-mode span {display:none;}
+#panel-mushaf.mushaf-no-frame .mushaf-verses {border-color:transparent!important;border-radius:0;box-shadow:none;}
+#panel-mushaf .mushaf-frame-option {display:flex;align-items:center;gap:.5rem;font:.85rem system-ui,sans-serif;margin:.7rem 0;}
+#panel-mushaf .mushaf-picker-button:disabled {opacity:.45;cursor:default;}
+#panel-mushaf .mushaf-basmala.is-playing {color:#c82828;}
+#panel-mushaf .mushaf-index-fields {grid-template-columns:minmax(0,1fr) minmax(0,.6fr) minmax(0,1fr);}
+@media (min-width:700px) {
+  #panel-mushaf .mushaf-reading-header {grid-template-columns:84px 76px minmax(0,1fr) 32px minmax(0,.8fr) 76px 70px!important;}
+  #panel-mushaf .mushaf-header-mode span {display:inline;font:.78rem system-ui,sans-serif;}
+}
+
 /* v0.24.2: visible desktop/TV navigation in gutters outside the text frame. */
 html:not(.mushaf-has-touch) #panel-mushaf .mushaf-reading {
   padding-left:44px;
