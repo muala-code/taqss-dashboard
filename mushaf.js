@@ -70,12 +70,59 @@
     if(c.surah===1)return null;
     return {surah:c.surah-1,ayah:state.surahs.get(c.surah-1).length,token:0};
   }
-  function options(){
-    const select=$('#mushafSurah');
-    for(let s=1;s<=114;s++){
-      const option=document.createElement('option');option.value=String(s);option.textContent=`${s}. ${state.names[s-1]}`;select.add(option);
+  function options(){refreshAyahOptions(state.cursor.surah,state.cursor.ayah);}
+  function quickDestination(kind,number){
+    if(kind==='surah')return state.surahs.has(number)?{surah:number,ayah:1,token:0}:null;
+    if(kind==='juz')for(const [surah,verses] of state.surahs){
+      const verse=verses.find(v=>v.juz===number);
+      if(verse)return {surah,ayah:verse.ayah,token:0};
     }
-    refreshAyahOptions(1,1);
+    return null;
+  }
+  function quickNavigate(kind,number){
+    const destination=quickDestination(kind,number);if(!destination)return;
+    stopAudio();state.audioKind='verse';state.selected=clone(destination);state.audioSelectionPending=true;
+    goTo(destination.surah,destination.ayah);saveSettings();
+  }
+  function setupQuickNavigation(){
+    const menu=$('#mushafQuickMenu');let trigger=null;
+    const close=(restoreFocus=false)=>{
+      menu.hidden=true;state.quickOpen=false;
+      for(const id of ['mushafHeaderJuz','mushafHeaderSurah'])$('#'+id).setAttribute('aria-expanded','false');
+      if(restoreFocus)trigger?.focus();
+    };
+    state.closeQuickNavigation=close;
+    const open=(kind,button)=>{
+      if(!state.ready)return;
+      if(state.quickOpen&&trigger===button){close(true);return;}
+      close();trigger=button;menu.replaceChildren();
+      const current=kind==='surah'?state.cursor.surah:verseAt(state.cursor)?.juz;
+      menu.setAttribute('aria-label',kind==='surah'?'اختيار السورة':'اختيار الجزء');
+      for(let n=1;n<=(kind==='surah'?114:30);n++){
+        const item=document.createElement('button');item.type='button';item.setAttribute('role','option');
+        item.textContent=kind==='surah'?`${fmt(n)} · ${state.names[n-1]}`:`الجزء ${fmt(n)}`;
+        item.setAttribute('aria-selected',String(n===current));
+        item.addEventListener('click',()=>{close(true);quickNavigate(kind,n);});menu.append(item);
+      }
+      const header=button.closest('.mushaf-reading-header');
+      menu.style.top=`${header.offsetTop+header.offsetHeight+4}px`;
+      menu.hidden=false;state.quickOpen=true;button.setAttribute('aria-expanded','true');
+      const selected=menu.querySelector('[aria-selected="true"]');selected?.focus();selected?.scrollIntoView({block:'nearest'});
+    };
+    $('#mushafHeaderSurah').addEventListener('click',event=>open('surah',event.currentTarget));
+    $('#mushafHeaderJuz').addEventListener('click',event=>open('juz',event.currentTarget));
+    menu.addEventListener('keydown',event=>{
+      if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close(true);return;}
+      if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){
+        event.preventDefault();event.stopPropagation();const items=Array.from(menu.querySelectorAll('button'));let at=items.indexOf(document.activeElement);
+        at=event.key==='Home'?0:event.key==='End'?items.length-1:(at+(event.key==='ArrowDown'?1:-1)+items.length)%items.length;items[at]?.focus();
+      }
+    });
+    const outside=event=>{if(state.quickOpen&&!menu.contains(event.target)&&event.target!==trigger)close();};
+    document.addEventListener('pointerdown',outside);
+    document.addEventListener('click',outside);
+    menu.addEventListener('focusout',event=>{if(!menu.contains(event.relatedTarget)&&event.relatedTarget!==trigger)close();});
+    document.addEventListener('taqss:tab-change',()=>close());
   }
   function refreshAyahOptions(surah,ayah=1){
     const select=$('#mushafAyah');select.replaceChildren();
@@ -315,7 +362,7 @@
     requestAnimationFrame(()=>{state.layoutScheduled=false;render();});
   }
   function move(direction){
-    if(!state.ready||state.modalOpen)return;
+    if(!state.ready||state.modalOpen||state.quickOpen)return;
     if(direction==='next'){
       const next=validCursor(state.nextCursor);if(!next)return;
       state.history.push(clone(state.cursor));
@@ -383,7 +430,7 @@
   function openIndex(){
     const overlay=$('#mushafIndexOverlay');if(!state.ready)return;
     const focusFrom=document.activeElement;state.returnFocus=focusFrom;
-    $('#mushafSurah').value=String(state.cursor.surah);
+    state.closeQuickNavigation?.();
     refreshAyahOptions(state.cursor.surah,state.cursor.ayah);
     $('#mushafFontChoice').value=state.font;
     syncPickers();
@@ -790,7 +837,7 @@
   function setupSwipe(){
     const root=$('#mushafVerses');
     root.addEventListener('touchstart',event=>{
-      if(event.touches.length!==1||state.modalOpen){state.touch=null;return;}
+      if(event.touches.length!==1||state.modalOpen||state.quickOpen){state.touch=null;return;}
       const t=event.touches[0];state.touch={x:t.clientX,y:t.clientY};
     },{passive:true});
     root.addEventListener('touchend',event=>{
@@ -804,7 +851,7 @@
     },{passive:true});
     root.addEventListener('click',event=>{if(Date.now()<(state.suppressClickUntil||0)){event.stopPropagation();event.preventDefault();}},true);
     root.addEventListener('keydown',event=>{
-      if(state.modalOpen)return;
+      if(state.modalOpen||state.quickOpen)return;
       if(event.key==='ArrowRight'||event.key==='ArrowLeft'){
         event.preventDefault();move(event.key==='ArrowRight'?'next':'prev');
       }
@@ -823,11 +870,11 @@
     const applySize=()=>{ $('#panel-mushaf').dataset.mushafSize=state.fontSize; document.querySelectorAll('[name="mushafSize"]').forEach(el=>el.checked=el.value===state.fontSize); scheduleRender(); };
     applySize();
     document.querySelectorAll('[name="mushafSize"]').forEach(el=>el.addEventListener('change',()=>{state.fontSize=el.value;state.history=[];applySize();saveSettings();}));
-    setupFullscreen();setupSwipe();setupAudio();setupMushafPickers();
+    setupFullscreen();setupSwipe();setupAudio();setupMushafPickers();setupQuickNavigation();
     $('#mushafNavPrev').addEventListener('click',()=>move('prev'));
     $('#mushafNavNext').addEventListener('click',()=>move('next'));
     document.addEventListener('keydown',event=>{
-      if(event.defaultPrevented||state.modalOpen||$('#panel-mushaf').hidden)return;
+      if(event.defaultPrevented||state.modalOpen||state.quickOpen||$('#panel-mushaf').hidden)return;
       if(event.key!=='ArrowRight'&&event.key!=='ArrowLeft')return;
       const element=event.target;
       if(element?.matches?.('select,input,textarea,[contenteditable="true"]'))return;
@@ -858,10 +905,9 @@
         if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
       }
     });
-    $('#mushafSurah').addEventListener('change',event=>refreshAyahOptions(Number(event.target.value),1));
     $('#mushafJumpForm').addEventListener('submit',event=>{
       event.preventDefault();
-      const s=Number($('#mushafSurah').value),a=Number($('#mushafAyah').value);
+      const s=state.cursor.surah,a=Number($('#mushafAyah').value);
       if(!state.surahs.get(s)?.[a-1])return;
       const font=$('#mushafFontChoice').value;
       stopAudio();applyFont(font);

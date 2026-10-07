@@ -757,3 +757,16 @@ html:not(.mushaf-has-touch) #panel-mushaf .mushaf-tv-navigation {
 #panel-mushaf .mushaf-collapse-icon {display:none;}
 #panel-mushaf #mushafFullscreenButton[aria-pressed="true"] .mushaf-expand-icon {display:none;}
 #panel-mushaf #mushafFullscreenButton[aria-pressed="true"] .mushaf-collapse-icon {display:inline;}
+
+/* v0.24.6.4: direct chapter/juz navigation in the existing compact header. */
+#panel-mushaf .mushaf-reading-header button.mushaf-header-info {
+  width:100%;height:26px;min-width:0;min-height:26px;padding:.1rem .35rem;
+  background:transparent;border-inline:0;border-radius:0;font-size:.75rem;
+  cursor:pointer;display:block;
+}
+#panel-mushaf .mushaf-header-info:hover,#panel-mushaf .mushaf-header-info:focus-visible {background:color-mix(in srgb,#258a74 12%,Canvas);}
+#panel-mushaf .mushaf-quick-menu {position:absolute;inset-inline: .4rem;z-index:40;max-height:min(48dvh,360px);overflow-y:auto;overscroll-behavior:contain;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.2rem;padding:.4rem;background:Canvas;color:CanvasText;border:1px solid #8aa995;border-radius:.45rem;box-shadow:0 5px 18px #0002;font:.85rem system-ui,sans-serif;}
+#panel-mushaf .mushaf-quick-menu[hidden] {display:none;}
+#panel-mushaf .mushaf-quick-menu button {min-width:0;min-height:36px;border:0;border-radius:.3rem;padding:.4rem;text-align:right;background:transparent;color:inherit;font:inherit;cursor:pointer;}
+#panel-mushaf .mushaf-quick-menu button[aria-selected="true"],#panel-mushaf .mushaf-quick-menu button:hover,#panel-mushaf .mushaf-quick-menu button:focus-visible {background:color-mix(in srgb,#258a74 18%,Canvas);}
+#panel-mushaf .mushaf-index-fields {grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
