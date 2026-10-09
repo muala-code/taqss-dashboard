@@ -428,20 +428,23 @@
     return forecastRequest;
   }
   function selectWeatherView(view) {
-    selectedWeatherView = view === "forecast" ? "forecast" : "current";
+    selectedWeatherView = ["forecast", "satellite"].includes(view) ? view : "current";
     const isCurrent = selectedWeatherView === "current";
     $("#weatherCurrentView").hidden = !isCurrent;
-    $("#weatherForecastView").hidden = isCurrent;
+    $("#weatherForecastView").hidden = selectedWeatherView !== "forecast";
+    $("#weatherSatelliteView").hidden = selectedWeatherView !== "satellite";
     $("#stationConnection").hidden = false;
     $("#weatherStatus").hidden = !isCurrent || !$("#weatherStatus").textContent;
     for (const [button, active] of [
       [$("#weatherCurrentButton"), isCurrent],
-      [$("#weatherForecastButton"), !isCurrent]
+      [$("#weatherForecastButton"), selectedWeatherView === "forecast"],
+      [$("#weatherSatelliteButton"), selectedWeatherView === "satellite"]
     ]) {
       button.classList.toggle("active", active);
       button.setAttribute("aria-pressed", String(active));
     }
-    if (!isCurrent) loadForecast();
+    if (selectedWeatherView === "forecast") loadForecast();
+    document.dispatchEvent(new CustomEvent("taqss:weather-view", {detail: selectedWeatherView}));
     syncWeatherRefresh();
   }
   function destroyChart() { if (chart) { chart.destroy(); chart = null; } }
@@ -1154,6 +1157,7 @@
   setupChartPicker();
   $("#weatherCurrentButton").addEventListener("click", () => selectWeatherView("current"));
   $("#weatherForecastButton").addEventListener("click", () => selectWeatherView("forecast"));
+  $("#weatherSatelliteButton").addEventListener("click", () => selectWeatherView("satellite"));
   updateStickyOffsets();
   window.addEventListener("resize", updateStickyOffsets, { passive: true });
   if (typeof ResizeObserver !== "undefined") {
