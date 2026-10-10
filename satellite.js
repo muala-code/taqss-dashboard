@@ -14,6 +14,8 @@
   const stage=document.createElement('div'); stage.className='satellite-stage'; while(picture.firstChild)stage.append(picture.firstChild); picture.append(stage,fullscreen);
   const towns=[
     ['خيبر',25.713438,39.280308],
+    ['العيص',25.06357,38.10854],
+    ['الرايس',23.57506,38.60336],
     ['الحناكية',24.879722,40.515278],
     ['بدر',23.782918,38.790468],
     ['المهد',23.499655,40.884084],
@@ -30,8 +32,43 @@
     marker.append(dot,label);stage.append(marker);
   }
 
+  // All images and place labels share one transform, keeping map locations aligned.
+  let zoom=1, panX=0, panY=0, gesture=null;
+  const pointers=new Map();
+  const isFull=()=>document.fullscreenElement===picture||picture.classList.contains('satellite-full');
+  const zoomControls=document.createElement('div');zoomControls.className='satellite-zoom-controls';zoomControls.hidden=true;
+  zoomControls.innerHTML='<button type="button" id="satelliteZoomIn" aria-label="تكبير الصورة" title="تكبير">＋</button><button type="button" id="satelliteZoomOut" aria-label="تصغير الصورة" title="تصغير">−</button><button type="button" id="satelliteZoomReset" aria-label="إعادة حجم الصورة وموضعها" title="إعادة الضبط">↺</button>';
+  picture.append(zoomControls);
+  function bounds(){const r=picture.getBoundingClientRect();return {width:r.width,height:r.height,side:Math.min(r.width,r.height)};}
+  function applyZoom(){
+    const full=isFull();zoomControls.hidden=!full;
+    if(!full){stage.style.transform='';picture.style.cursor='';return;}
+    const b=bounds();
+    const limitX=Math.max(0,(b.side*zoom-b.width)/2),limitY=Math.max(0,(b.side*zoom-b.height)/2);
+    panX=Math.max(-limitX,Math.min(limitX,panX));panY=Math.max(-limitY,Math.min(limitY,panY));
+    stage.style.transform=`translate(-50%,-50%) translate(${panX}px,${panY}px) scale(${zoom})`;
+    picture.style.cursor=zoom>1?'grab':'default';
+    $('satelliteZoomOut').disabled=zoom<=1;$('satelliteZoomIn').disabled=zoom>=4;
+  }
+  function resetZoom(){zoom=1;panX=panY=0;pointers.clear();gesture=null;applyZoom();}
+  function zoomAt(value,anchor={x:0,y:0}){const next=Math.max(1,Math.min(4,value)),ratio=next/zoom;panX=anchor.x+(panX-anchor.x)*ratio;panY=anchor.y+(panY-anchor.y)*ratio;zoom=next;applyZoom();}
+  $('satelliteZoomIn').addEventListener('click',()=>zoomAt(zoom*1.3));
+  $('satelliteZoomOut').addEventListener('click',()=>zoomAt(zoom/1.3));
+  $('satelliteZoomReset').addEventListener('click',resetZoom);
+  function relative(point){const r=picture.getBoundingClientRect();return {x:point.x-r.left-r.width/2,y:point.y-r.top-r.height/2};}
+  function beginGesture(){const pts=[...pointers.values()];if(pts.length>=2){const mid=relative({x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2});gesture={pinch:true,distance:Math.max(1,Math.hypot(pts[1].x-pts[0].x,pts[1].y-pts[0].y)),mid,zoom,x:panX,y:panY};}else if(pts.length===1)gesture={point:pts[0],x:panX,y:panY};else gesture=null;}
+  picture.addEventListener('pointerdown',e=>{if(!isFull()||e.target.closest('button')||(e.pointerType==='mouse'&&e.button!==0))return;e.preventDefault();pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});picture.setPointerCapture(e.pointerId);beginGesture();});
+  picture.addEventListener('pointermove',e=>{if(!isFull()||!pointers.has(e.pointerId)||!gesture)return;e.preventDefault();pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const pts=[...pointers.values()];if(gesture.pinch&&pts.length>=2){const mid=relative({x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2});zoom=Math.max(1,Math.min(4,gesture.zoom*Math.hypot(pts[1].x-pts[0].x,pts[1].y-pts[0].y)/gesture.distance));const ratio=zoom/gesture.zoom;panX=mid.x+(gesture.x-gesture.mid.x)*ratio;panY=mid.y+(gesture.y-gesture.mid.y)*ratio;}else if(zoom>1){panX=gesture.x+pts[0].x-gesture.point.x;panY=gesture.y+pts[0].y-gesture.point.y;}applyZoom();});
+  const endPointer=e=>{pointers.delete(e.pointerId);beginGesture();};
+  for(const event of ['pointerup','pointercancel','lostpointercapture'])picture.addEventListener(event,endPointer);
+  picture.addEventListener('wheel',e=>{if(!isFull())return;e.preventDefault();zoomAt(zoom*Math.exp(-e.deltaY*.002),relative({x:e.clientX,y:e.clientY}));},{passive:false});
+  picture.addEventListener('dblclick',e=>{if(!isFull()||e.target.closest('button'))return;e.preventDefault();if(zoom>1)resetZoom();else zoomAt(2,relative({x:e.clientX,y:e.clientY}));});
+  document.addEventListener('keydown',e=>{if(!isFull()||e.target.closest('input,select,textarea'))return;if(['+','=','-','0','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();if(e.key==='+'||e.key==='=')zoomAt(zoom*1.3);else if(e.key==='-')zoomAt(zoom/1.3);else if(e.key==='0')resetZoom();else{panX+=e.key==='ArrowLeft'?40:e.key==='ArrowRight'?-40:0;panY+=e.key==='ArrowUp'?40:e.key==='ArrowDown'?-40:0;applyZoom();}}});
+  window.addEventListener('resize',applyZoom);
+  document.addEventListener('fullscreenchange',resetZoom);
+
   const style=document.createElement('style');
-  style.textContent='.satellite-stage{position:absolute;inset:0}.satellite-picture:fullscreen .satellite-stage,.satellite-picture.satellite-full .satellite-stage{inset:auto;left:50%;top:50%;width:min(100vw,100dvh);height:min(100vw,100dvh);transform:translate(-50%,-50%)}.satellite-picture:fullscreen,.satellite-picture.satellite-full{position:fixed;inset:0;z-index:99999;width:100%;height:100dvh;aspect-ratio:auto;border-radius:0;background:#18232e}.satellite-picture:fullscreen img,.satellite-picture.satellite-full img{object-fit:fill}body.satellite-full-open{overflow:hidden}.satellite-mode-nav{display:flex;align-items:center;gap:.4rem;margin:.5rem 0}.satellite-mode-nav button{font:inherit;padding:.35rem .8rem;border:1px solid #b8c4cd;border-radius:.45rem;background:Canvas;color:CanvasText}.satellite-mode-nav button[aria-pressed=true]{background:#e4f0eb;color:#155b44;border-color:#8dbba1;font-weight:700}.satellite-mode-nav #satelliteRefresh{margin-inline-start:auto;padding:.3rem .6rem}.satellite-archive{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.45rem .6rem;align-items:end;margin:.6rem 0}.satellite-archive label{display:flex;flex-direction:column;gap:.2rem;font-size:.8rem;min-width:0}.satellite-archive input{width:100%;min-width:0;box-sizing:border-box}.satellite-archive>span{font-size:.75rem}.satellite-archive #satelliteFetch{justify-self:start;padding:.35rem 1.2rem}.satellite-mode-nav [hidden],.satellite-archive[hidden]{display:none!important}.satellite-archive input,.satellite-archive button{font:inherit;padding:.4rem;border:1px solid #b8c4cd;border-radius:.4rem;background:Canvas;color:CanvasText}';
+  style.textContent='.satellite-picture:fullscreen,.satellite-picture.satellite-full{touch-action:none;user-select:none}.satellite-zoom-controls{position:absolute;right:.6rem;bottom:.6rem;display:flex;gap:.3rem;z-index:6;direction:ltr}.satellite-zoom-controls[hidden]{display:none!important}.satellite-zoom-controls button{width:36px;height:36px;padding:0;border:1px solid #b8c4cd;border-radius:.35rem;background:#fff;color:#18232e;font:22px sans-serif;cursor:pointer}.satellite-zoom-controls button:disabled{opacity:.45}.satellite-stage img{pointer-events:none;-webkit-user-drag:none}.satellite-stage{position:absolute;inset:0}.satellite-picture:fullscreen .satellite-stage,.satellite-picture.satellite-full .satellite-stage{inset:auto;left:50%;top:50%;width:min(100vw,100dvh);height:min(100vw,100dvh);transform:translate(-50%,-50%)}.satellite-picture:fullscreen,.satellite-picture.satellite-full{position:fixed;inset:0;z-index:99999;width:100%;height:100dvh;aspect-ratio:auto;border-radius:0;background:#18232e}.satellite-picture:fullscreen img,.satellite-picture.satellite-full img{object-fit:fill}body.satellite-full-open{overflow:hidden}.satellite-mode-nav{display:flex;align-items:center;gap:.4rem;margin:.5rem 0}.satellite-mode-nav button{font:inherit;padding:.35rem .8rem;border:1px solid #b8c4cd;border-radius:.45rem;background:Canvas;color:CanvasText}.satellite-mode-nav button[aria-pressed=true]{background:#e4f0eb;color:#155b44;border-color:#8dbba1;font-weight:700}.satellite-mode-nav #satelliteRefresh{margin-inline-start:auto;padding:.3rem .6rem}.satellite-archive{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.45rem .6rem;align-items:end;margin:.6rem 0}.satellite-archive label{display:flex;flex-direction:column;gap:.2rem;font-size:.8rem;min-width:0}.satellite-archive input{width:100%;min-width:0;box-sizing:border-box}.satellite-archive>span{font-size:.75rem}.satellite-archive #satelliteFetch{justify-self:start;padding:.35rem 1.2rem}.satellite-mode-nav [hidden],.satellite-archive[hidden]{display:none!important}.satellite-archive input,.satellite-archive button{font:inherit;padding:.4rem;border:1px solid #b8c4cd;border-radius:.4rem;background:Canvas;color:CanvasText}';
   document.head.append(style);
   const controls=document.createElement('div'); controls.className='satellite-archive';
   controls.innerHTML='<label>التاريخ <input id="satelliteDate" type="date"></label><label>الوقت <input id="satelliteTime" type="time" value="12:00"></label><button type="button" id="satelliteFetch">جلب</button><span style="font-size:.8rem">بتوقيت السعودية</span>';
@@ -45,8 +82,8 @@
   $('satelliteDate').value=new Date(Date.now()+10800000).toISOString().slice(0,10);
   const toggleFull=async()=>{
     if(document.fullscreenElement===picture){await document.exitFullscreen();return;}
-    if(picture.classList.contains('satellite-full')){picture.classList.remove('satellite-full');document.body.classList.remove('satellite-full-open');fullscreen.textContent='⛶';return;}
-    try{if(!picture.requestFullscreen) throw new Error();await picture.requestFullscreen();}catch{picture.classList.add('satellite-full');document.body.classList.add('satellite-full-open');fullscreen.textContent='✕';}
+    if(picture.classList.contains('satellite-full')){picture.classList.remove('satellite-full');document.body.classList.remove('satellite-full-open');fullscreen.textContent='⛶';resetZoom();return;}
+    try{if(!picture.requestFullscreen) throw new Error();await picture.requestFullscreen();}catch{picture.classList.add('satellite-full');document.body.classList.add('satellite-full-open');fullscreen.textContent='✕';resetZoom();}
   };
   fullscreen.addEventListener('click',toggleFull);
   document.addEventListener('fullscreenchange',()=>{fullscreen.textContent=document.fullscreenElement===picture?'✕':'⛶';});
