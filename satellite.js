@@ -6,7 +6,7 @@
   const layers = {visible:'mtg_fd:vis06_hrfi',infrared:'mtg_fd:ir105_hrfi',rain:'mtg_fd:h40b',lightning:'mtg_fd:li_afa'};
   let metadata = {}, metadataAt = 0, attemptAt = 0, timer = null, busy = false, focused = true, generation = 0;
   const times = {}, ranges = {}, saved = {};
-  let archiveTime = null;
+  let archiveTime = null, archiveMode = false;
   const picture = document.querySelector('.satellite-picture');
   const fullscreen = document.createElement('button');
   fullscreen.type='button'; fullscreen.textContent='⛶'; fullscreen.title='ملء الشاشة'; fullscreen.setAttribute('aria-label','ملء الشاشة');
@@ -31,12 +31,17 @@
   }
 
   const style=document.createElement('style');
-  style.textContent='.satellite-stage{position:absolute;inset:0}.satellite-picture:fullscreen .satellite-stage,.satellite-picture.satellite-full .satellite-stage{inset:auto;left:50%;top:50%;width:min(100vw,100dvh);height:min(100vw,100dvh);transform:translate(-50%,-50%)}.satellite-picture:fullscreen,.satellite-picture.satellite-full{position:fixed;inset:0;z-index:99999;width:100%;height:100dvh;aspect-ratio:auto;border-radius:0;background:#18232e}.satellite-picture:fullscreen img,.satellite-picture.satellite-full img{object-fit:fill}body.satellite-full-open{overflow:hidden}.satellite-archive{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.5rem 0}.satellite-archive input,.satellite-archive button{font:inherit;padding:.4rem;border:1px solid #b8c4cd;border-radius:.4rem;background:Canvas;color:CanvasText}';
+  style.textContent='.satellite-stage{position:absolute;inset:0}.satellite-picture:fullscreen .satellite-stage,.satellite-picture.satellite-full .satellite-stage{inset:auto;left:50%;top:50%;width:min(100vw,100dvh);height:min(100vw,100dvh);transform:translate(-50%,-50%)}.satellite-picture:fullscreen,.satellite-picture.satellite-full{position:fixed;inset:0;z-index:99999;width:100%;height:100dvh;aspect-ratio:auto;border-radius:0;background:#18232e}.satellite-picture:fullscreen img,.satellite-picture.satellite-full img{object-fit:fill}body.satellite-full-open{overflow:hidden}.satellite-mode-nav{display:flex;align-items:center;gap:.4rem;margin:.5rem 0}.satellite-mode-nav button{font:inherit;padding:.35rem .8rem;border:1px solid #b8c4cd;border-radius:.45rem;background:Canvas;color:CanvasText}.satellite-mode-nav button[aria-pressed=true]{background:#e4f0eb;color:#155b44;border-color:#8dbba1;font-weight:700}.satellite-mode-nav #satelliteRefresh{margin-inline-start:auto;padding:.3rem .6rem}.satellite-archive{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.45rem .6rem;align-items:end;margin:.6rem 0}.satellite-archive label{display:flex;flex-direction:column;gap:.2rem;font-size:.8rem;min-width:0}.satellite-archive input{width:100%;min-width:0;box-sizing:border-box}.satellite-archive>span{font-size:.75rem}.satellite-archive #satelliteFetch{justify-self:start;padding:.35rem 1.2rem}.satellite-mode-nav [hidden],.satellite-archive[hidden]{display:none!important}.satellite-archive input,.satellite-archive button{font:inherit;padding:.4rem;border:1px solid #b8c4cd;border-radius:.4rem;background:Canvas;color:CanvasText}';
   document.head.append(style);
   const controls=document.createElement('div'); controls.className='satellite-archive';
-  controls.innerHTML='<label>التاريخ <input id="satelliteDate" type="date"></label><label>الوقت <input id="satelliteTime" type="time" value="12:00"></label><button type="button" id="satelliteFetch">جلب</button><button type="button" id="satelliteLatest">الأحدث</button><span style="font-size:.8rem">بتوقيت السعودية</span>';
-  document.querySelector('.satellite-controls').after(controls);
-  const archiveRange=document.createElement('p');archiveRange.className='satellite-caption';controls.after(archiveRange);
+  controls.innerHTML='<label>التاريخ <input id="satelliteDate" type="date"></label><label>الوقت <input id="satelliteTime" type="time" value="12:00"></label><button type="button" id="satelliteFetch">جلب</button><span style="font-size:.8rem">بتوقيت السعودية</span>';
+  const modeNav=document.createElement('div');modeNav.className='satellite-mode-nav';modeNav.setAttribute('role','group');modeNav.setAttribute('aria-label','وقت الصورة الفضائية');
+  modeNav.innerHTML='<button type="button" id="satelliteLatest" aria-pressed="true">الأحدث</button><button type="button" id="satelliteArchive" aria-pressed="false" aria-controls="satelliteArchiveControls" aria-expanded="false">الأرشيف</button>';
+  controls.id='satelliteArchiveControls';controls.hidden=true;
+  document.querySelector('.satellite-controls').after(modeNav);modeNav.after(controls);modeNav.append($('satelliteRefresh'));
+  function setMode(archive){archiveMode=archive;controls.hidden=!archive;archiveRange.hidden=!archive;$('satelliteRefresh').hidden=archive;$('satelliteLatest').setAttribute('aria-pressed',String(!archive));$('satelliteArchive').setAttribute('aria-pressed',String(archive));$('satelliteArchive').setAttribute('aria-expanded',String(archive));}
+
+  const archiveRange=document.createElement('p');archiveRange.className='satellite-caption';archiveRange.hidden=true;controls.after(archiveRange);
   $('satelliteDate').value=new Date(Date.now()+10800000).toISOString().slice(0,10);
   const toggleFull=async()=>{
     if(document.fullscreenElement===picture){await document.exitFullscreen();return;}
@@ -52,8 +57,9 @@
   function showSaved(){for(const [key,layer,id] of requestedLayers()){const item=saved[layer];if(item){$(id).src=item.src;$(id).hidden=false;times[key]=item.time;}}describe();}
   function requestedLayers(){const r=[['base',layers[channel()],'satelliteBase']];if($('satelliteRain').checked)r.push(['rain',layers.rain,'satelliteRainImage']);if($('satelliteLightning').checked)r.push(['lightning',layers.lightning,'satelliteLightningImage']);return r;}
   function selectedTime(layer){if(!archiveTime)return metadata[layer];const range=ranges[layer];if(!range)throw new Error('range');const target=Date.parse(archiveTime);if(target<range.start||target>range.end)throw new Error('outside');return new Date(Math.min(range.end,Math.max(range.start,range.start+Math.round((target-range.start)/range.step)*range.step))).toISOString();}
-  $('satelliteFetch').addEventListener('click',()=>{const v=$('satelliteDate').value+'T'+$('satelliteTime').value+':00+03:00';if(!Number.isFinite(Date.parse(v))){$('satelliteStatus').textContent='اختر تاريخًا ووقتًا صالحين.';return;}archiveTime=new Date(v).toISOString();generation++;load(true);});
-  $('satelliteLatest').addEventListener('click',()=>{archiveTime=null;generation++;metadataAt=0;load(true);});
+  $('satelliteFetch').addEventListener('click',()=>{const v=$('satelliteDate').value+'T'+$('satelliteTime').value+':00+03:00';if(!Number.isFinite(Date.parse(v))){$('satelliteStatus').textContent='اختر تاريخًا ووقتًا صالحين.';return;}setMode(true);archiveTime=new Date(v).toISOString();generation++;load(true);});
+  $('satelliteLatest').addEventListener('click',()=>{setMode(false);archiveTime=null;generation++;metadataAt=0;showSaved();load(true);});
+  $('satelliteArchive').addEventListener('click',()=>{setMode(true);generation++;$('satelliteStatus').textContent=archiveTime?'عرض أرشيفي.':'اختر التاريخ والوقت ثم اضغط جلب.';});
   const active = () => focused && document.visibilityState === 'visible' && !$('panel-weather').hidden && !$('weatherSatelliteView').hidden;
   const clock = iso => new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn', {timeZone:'Asia/Riyadh',year:'numeric',day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(iso));
   function channel() {
@@ -96,7 +102,7 @@
       }
     }
     if (!next[layers[channel()]]) throw new Error('missing layer');
-    metadata=next; metadataAt=Date.now(); const range=ranges[layers[channel()]]; if(range)archiveRange.textContent='أرشيف الصورة المتاح: '+clock(new Date(range.start).toISOString())+' إلى '+clock(new Date(range.end).toISOString())+' — قد تختلف مدة أرشيف الهطول والبرق.';
+    metadata=next; metadataAt=Date.now(); const range=ranges[layers[channel()]]; if(range)archiveRange.textContent='المتاح: '+new Date(range.start).toLocaleDateString('ar-SA-u-ca-gregory-nu-latn',{timeZone:'Asia/Riyadh'})+' إلى '+new Date(range.end).toLocaleDateString('ar-SA-u-ca-gregory-nu-latn',{timeZone:'Asia/Riyadh'});
   }
   function imageReady(src) {
     return new Promise((resolve,reject)=>{
@@ -107,12 +113,12 @@
   }
   function describe() {
     const labels={base:'الصورة',rain:'الهطول',lightning:'البرق'};
-    $('satelliteTimes').textContent=Object.entries(times).filter(([key])=>key==='base'||$(key==='rain'?'satelliteRain':'satelliteLightning').checked).map(([key,time])=>`${labels[key]}: ${clock(time)} (قبل ${Math.max(0,Math.round((Date.now()-Date.parse(time))/60000))} دقيقة)`).join(' · ');
+    $('satelliteTimes').textContent=Object.entries(times).filter(([key])=>key==='base'||$(key==='rain'?'satelliteRain':'satelliteLightning').checked).map(([key,time])=>`${labels[key]}: ${clock(time)}`+(archiveTime?'':` (قبل ${Math.max(0,Math.round((Date.now()-Date.parse(time))/60000))} دقيقة)`)).join(' · ');
   }
   async function load(force=false) {
-    if (!active() || busy || (!force && Date.now()-attemptAt<interval)) return;
+    if ((archiveMode&&!archiveTime) || !active() || busy || (!force && Date.now()-attemptAt<interval)) return;
     busy=true; attemptAt=Date.now(); const token=++generation;
-    $('satelliteRefresh').disabled=true; $('satelliteFetch').disabled=true; $('satelliteLatest').disabled=true;
+    $('satelliteRefresh').disabled=true; $('satelliteFetch').disabled=true;
     $('satelliteStatus').textContent=archiveTime?'جارٍ جلب أقرب لقطات متاحة للوقت المختار…':'جارٍ جلب أحدث صورة متاحة…';
     const requested=requestedLayers();
     const failures=[];
@@ -136,14 +142,14 @@
     } catch {
       if(token===generation) $('satelliteStatus').textContent='تعذر الاتصال بالمصدر. تُعرض آخر لقطة ناجحة إن توفرت.';
     } finally {
-      busy=false; $('satelliteRefresh').disabled=false; $('satelliteFetch').disabled=false; $('satelliteLatest').disabled=false; describe();
+      busy=false; $('satelliteRefresh').disabled=false; $('satelliteFetch').disabled=false; describe();
       // A changed selection while loading invalidates the result and starts its own request.
       if(token!==generation && active()) load(true);
     }
   }
   function sync() {
     clearInterval(timer); timer=null;
-    if(active()) { if(!archiveTime)load(); timer=setInterval(()=>{if(!archiveTime)load();},interval); }
+    if(active()) { if(!archiveMode)load(); timer=setInterval(()=>{if(!archiveMode)load();},interval); }
     else { generation++; if (busy) attemptAt=0; }
   }
   function selectionChanged() {
@@ -156,7 +162,7 @@
   restore();
   $('satelliteCopyright').textContent='© EUMETSAT '+new Date().getFullYear();
   for(const id of ['satelliteChannel','satelliteRain','satelliteLightning']) $(id).addEventListener('change',selectionChanged);
-  $('satelliteRefresh').addEventListener('click',()=>{ if(Date.now()-attemptAt>=30000) { archiveTime=null; metadataAt=0;load(true); } else $('satelliteStatus').textContent='انتظر قليلًا قبل إعادة التحديث.'; });
+  $('satelliteRefresh').addEventListener('click',()=>{ if(Date.now()-attemptAt>=30000) { setMode(false);archiveTime=null; metadataAt=0;load(true); } else $('satelliteStatus').textContent='انتظر قليلًا قبل إعادة التحديث.'; });
   document.addEventListener('taqss:weather-view',sync);
   document.addEventListener('taqss:tab-change',()=>setTimeout(sync,0));
   document.addEventListener('visibilitychange',sync);
