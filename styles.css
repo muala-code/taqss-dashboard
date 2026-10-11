@@ -769,3 +769,10 @@ html, body { touch-action: pan-x pan-y; }
 #panel-markets .markets-delay-note {color:color-mix(in srgb,CanvasText 75%,Canvas);}
 #panel-markets .markets-last-reading {color:#2563b8;font-weight:650;}
 @media (prefers-color-scheme:dark) {#panel-markets .markets-last-reading {color:#8bbaff;}}
+
+/* Stock heading and readable footer accents. */
+#panel-markets .market-group-heading {justify-content:space-between;}
+#panel-markets .markets-delay-note {color:#b91c1c;}
+#panel-markets .markets-footer-separator {color:color-mix(in srgb,CanvasText 35%,Canvas);}
+#panel-markets .markets-footer {gap:.2rem .55rem;align-items:center;}
+@media (prefers-color-scheme:dark) {#panel-markets .markets-delay-note {color:#fca5a5;}}

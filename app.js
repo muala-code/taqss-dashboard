@@ -689,7 +689,7 @@
   }
   function buildMarketHeader(title) {
     const head = document.createElement('div'); head.className = 'market-group-heading';
-    const h = document.createElement('h3'); h.textContent = 'أسهم مختارة';
+    const h = document.createElement('h3'); h.textContent = 'الأسهم';
     const add = document.createElement('button'); add.type = 'button'; add.className = 'market-add'; add.textContent = '+';
     add.setAttribute('aria-label', 'إضافة سهم'); add.addEventListener('click', openAddStock);
     head.append(h, add); return head;
@@ -912,11 +912,12 @@
       root.replaceChildren(frag);
       if (root.querySelector(".market-cards")) root.querySelector(".market-cards").scrollTop = scrollTop;
       status.replaceChildren();
-      const delay = document.createElement('span'); delay.className = 'markets-delay-note'; delay.textContent = 'الأسعار قد تكون متأخرة';
+      const delay = document.createElement('span'); delay.className = 'markets-delay-note'; delay.textContent = 'ⓘ الأسعار قد تكون متأخرة';
       status.appendChild(delay);
       if (d.updatedAt) {
+        const separator = document.createElement('span'); separator.className = 'markets-footer-separator'; separator.textContent = '|'; separator.setAttribute('aria-hidden','true'); status.appendChild(separator);
         const update = document.createElement('span'); update.className = 'markets-last-reading';
-        update.textContent = `آخر قراءة: ${formatUpdateTime(d.updatedAt)}`;
+        update.textContent = `◷ وقت آخر قراءة: ${formatUpdateTime(d.updatedAt)}`;
         status.appendChild(update);
       }
     } catch (e) { status.textContent = `تعذر جلب الأسعار: ${e.message}`; }
