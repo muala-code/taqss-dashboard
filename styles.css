@@ -776,3 +776,11 @@ html, body { touch-action: pan-x pan-y; }
 #panel-markets .markets-footer-separator {color:color-mix(in srgb,CanvasText 35%,Canvas);}
 #panel-markets .markets-footer {gap:.2rem .55rem;align-items:center;}
 @media (prefers-color-scheme:dark) {#panel-markets .markets-delay-note {color:#fca5a5;}}
+
+/* One-line footer: neutral text, colored icons. */
+#panel-markets .markets-footer {flex-wrap:nowrap;font-size:clamp(.65rem,2.65vw,.86rem);gap:.15rem .35rem;white-space:nowrap;}
+#panel-markets .markets-delay-note,#panel-markets .markets-last-reading {color:CanvasText;font-weight:500;}
+#panel-markets .markets-info-icon {color:#b91c1c;}
+#panel-markets .markets-clock-icon {color:#2563b8;}
+.stock-currency {font-size:.65rem;font-weight:400;}
+@media (prefers-color-scheme:dark) {#panel-markets .markets-info-icon {color:#fca5a5;} #panel-markets .markets-clock-icon {color:#8bbaff;}}

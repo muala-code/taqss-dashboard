@@ -9,11 +9,16 @@
       enabled: x?.enabled !== false
     })).filter(x => x.symbol && x.name);
   }
+  function normalizeStockSymbol(value) {
+    const raw = String(value || '').trim().toUpperCase().replace(/[٠-٩]/g, c => String(c.charCodeAt(0)-1632));
+    if (/^\d{4}(?:\.SR)?$/.test(raw)) return raw.endsWith('.SR') ? raw : raw + '.SR';
+    return /^[A-Z]{1,6}(?:[.-][A-Z]{1,2})?$/.test(raw) ? raw : null;
+  }
   function initialMarkets() {
     const base = cloneMarkets(window.TAQSS_MARKETS || []);
     try {
       const saved = cloneMarkets(JSON.parse(localStorage.getItem('taqss-added-stocks') || '[]'));
-      for (const item of saved) if (/^\d{4}\.SR$/.test(item.symbol) && !base.some(x => x.symbol.toUpperCase() === item.symbol.toUpperCase())) base.push({...item, category:'stock', enabled:true});
+      for (const item of saved) if (normalizeStockSymbol(item.symbol) && !base.some(x => x.symbol.toUpperCase() === item.symbol.toUpperCase())) base.push({...item, category:'stock', enabled:true});
     } catch (_) {}
     return base;
   }
@@ -697,22 +702,22 @@
   function openAddStock() {
     if (document.querySelector('.stock-add-dialog')) return;
     const dialog = document.createElement('dialog'); dialog.className = 'stock-add-dialog';
-    dialog.innerHTML = `<form><h3>إضافة سهم</h3><label>رمز السهم السعودي<input name="symbol" inputmode="numeric" maxlength="4" placeholder="4190" required pattern="[0-9]{4}"></label><label>اسم العرض (اختياري)<input name="name" maxlength="40"></label><p>يُحفظ على هذا الجهاز.</p><p class="stock-add-status" role="status"></p><div><button type="submit">إضافة</button><button type="button" class="stock-add-cancel">إلغاء</button></div></form>`;
+    dialog.innerHTML = `<form><h3>إضافة سهم</h3><label>رمز السهم<input name="symbol" dir="ltr" autocapitalize="characters" maxlength="12" placeholder="4190 أو AAPL" required></label><label>اسم العرض (اختياري)<input name="name" maxlength="40"></label><p>يُحفظ على هذا الجهاز.</p><p class="stock-add-status" role="status"></p><div><button type="submit">إضافة</button><button type="button" class="stock-add-cancel">إلغاء</button></div></form>`;
     document.body.append(dialog);
     dialog.addEventListener('close', () => dialog.remove());
     dialog.querySelector('.stock-add-cancel').onclick = () => dialog.close();
     dialog.querySelector('form').onsubmit = async e => {
       e.preventDefault();
       const form = e.currentTarget, status = form.querySelector('.stock-add-status');
-      const symbol = form.elements.symbol.value.trim() + '.SR';
-      if (!/^\d{4}\.SR$/.test(symbol)) { status.textContent = 'أدخل رمزًا من أربعة أرقام.'; return; }
+      const symbol = normalizeStockSymbol(form.elements.symbol.value);
+      if (!symbol) { status.textContent = 'أدخل رمزًا مثل 4190 أو AAPL.'; return; }
       if (marketsCfg.some(x => x.symbol.toUpperCase() === symbol)) { status.textContent = 'السهم موجود بالفعل في القائمة.'; return; }
       const submit = form.querySelector('[type="submit"]'); submit.disabled = true; status.textContent = 'جارٍ التحقق…';
       try {
         const data = await getJson(`${dashboardBase()}/api/markets?symbols=${encodeURIComponent(symbol)}`);
         const quote = (data.items || []).find(x => x.symbol === symbol);
         if (!quote || finite(quote.price) === null) throw new Error('تعذر التحقق من السهم، حاول لاحقًا.');
-        const item = {symbol, name:form.elements.name.value.trim() || quote.name || symbol.slice(0,4), category:'stock', enabled:true};
+        const item = {symbol, name:form.elements.name.value.trim() || quote.name || symbol.replace(/\.SR$/, ''), category:'stock', enabled:true};
         let saved;
         try { saved = cloneMarkets(JSON.parse(localStorage.getItem('taqss-added-stocks') || '[]')); } catch (_) { saved = []; }
         saved = saved.filter(x => x.symbol !== symbol); saved.push(item);
@@ -892,6 +897,11 @@
               row.setAttribute("aria-label", `${item.name}، عرض التفاصيل`);
               row.setAttribute('aria-expanded','false');
               row.querySelector('.market-name').textContent = item.name;
+              const currency = String(q.currency || '').trim();
+              if (!item.symbol.endsWith('.SR') && currency) {
+                const unit = document.createElement('small'); unit.className = 'stock-currency'; unit.textContent = currency;
+                row.querySelector('.num').append(' ', unit);
+              }
               itemWrap.append(row);
               let press = null, moved = false;
               row.addEventListener('pointerdown', e => { press = {x:e.clientX,y:e.clientY}; moved = false; });
@@ -912,12 +922,15 @@
       root.replaceChildren(frag);
       if (root.querySelector(".market-cards")) root.querySelector(".market-cards").scrollTop = scrollTop;
       status.replaceChildren();
-      const delay = document.createElement('span'); delay.className = 'markets-delay-note'; delay.textContent = 'ⓘ الأسعار قد تكون متأخرة';
+      const delay = document.createElement('span'); delay.className = 'markets-delay-note'; delay.appendChild(document.createTextNode('الأسعار قد تكون متأخرة'));
+      const infoIcon = document.createElement('span'); infoIcon.className = 'markets-info-icon'; infoIcon.textContent = 'ⓘ'; infoIcon.setAttribute('aria-hidden','true'); delay.prepend(infoIcon, ' ');
       status.appendChild(delay);
       if (d.updatedAt) {
         const separator = document.createElement('span'); separator.className = 'markets-footer-separator'; separator.textContent = '|'; separator.setAttribute('aria-hidden','true'); status.appendChild(separator);
         const update = document.createElement('span'); update.className = 'markets-last-reading';
-        update.textContent = `◷ وقت آخر قراءة: ${formatUpdateTime(d.updatedAt)}`;
+        const clockIcon = document.createElement('span'); clockIcon.className = 'markets-clock-icon'; clockIcon.textContent = '◷'; clockIcon.setAttribute('aria-hidden','true');
+        const time = document.createElement('bdi'); time.textContent = formatUpdateTime(d.updatedAt); update.setAttribute('aria-label', `آخر قراءة: ${formatUpdateTime(d.updatedAt)}`);
+        update.append(clockIcon, ' ', time);
         status.appendChild(update);
       }
     } catch (e) { status.textContent = `تعذر جلب الأسعار: ${e.message}`; }
