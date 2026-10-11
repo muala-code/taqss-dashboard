@@ -473,7 +473,30 @@
       }
     };
   }
+  const historyCache = new Map();
+  async function getHistoryJson(url, kind) {
+    const ttl = kind.startsWith("today-") ? 15 * 60 * 1000 : 60 * 60 * 1000;
+    const day = new Date().toLocaleDateString("en-CA", {timeZone: cfg.timeZone || "Asia/Riyadh"});
+    const cacheKey = kind.startsWith("today-") ? `${url}|${day}` : url;
+    const cached = historyCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < ttl) return cached.promise;
+    const entry = { at: Date.now(), promise: getJson(url) };
+    historyCache.set(cacheKey, entry);
+    try { return await entry.promise; }
+    catch (e) { if (historyCache.get(cacheKey) === entry) historyCache.delete(cacheKey); throw e; }
+  }
+  let chartLastAttempt = 0;
+  function refreshVisibleChart() {
+    if (document.visibilityState !== "visible" || $("#panel-history")?.hidden) return;
+    const ttl = selectedChartKind.startsWith("today-") ? 15 * 60 * 1000 : 60 * 60 * 1000;
+    if (Date.now() - chartLastAttempt >= ttl) loadChart(selectedChartKind);
+  }
+  document.addEventListener("visibilitychange", refreshVisibleChart);
+  window.addEventListener("focus", refreshVisibleChart);
+  setInterval(refreshVisibleChart, 60 * 1000);
+
   async function loadChart(kind) {
+    chartLastAttempt = Date.now();
     const requestVersion=++chartLoadVersion;
     ensureChartState();
     updatePeriodNav(kind);
@@ -487,7 +510,7 @@
     try {
       let data, spec;
       if (kind === "year-stats") {
-        data = await getJson(`${String(cfg.enrichmentApiBase || dashboardBase()).replace(/\/$/, "")}/api/history/stats?year=${chartState.year}`);
+        data = await getHistoryJson(`${String(cfg.enrichmentApiBase || dashboardBase()).replace(/\/$/, "")}/api/history/stats?year=${chartState.year}`, kind);
         if(requestVersion!==chartLoadVersion)return;
         const box = $("#historyStats tbody"); box.replaceChildren();
         for (const row of data.stats || []) {
@@ -503,11 +526,18 @@
         }
         status.textContent = `${chartState.year} — ${data.coverage || ''}`; return;
       } else if (kind.startsWith("today-")) {
-        data = await getJson(api("/api/history/today"));
+        data = await getHistoryJson(api("/api/history/today"), kind);
         if(requestVersion!==chartLoadVersion)return;
         const pts = (data.points || [])
           .filter(p => p?.observedAt && finite(p.temperature) !== null)
           .sort((a,b) => new Date(a.observedAt) - new Date(b.observedAt));
+        const feels = pts.map(p => {
+          if (finite(p.feelsLike) !== null) return finite(p.feelsLike);
+          const t = finite(p.temperature);
+          if (t === null || (t >= 27 && finite(p.humidity) === null) || (t <= 10 && finite(p.windSpeed) === null)) return null;
+          return calculatedFeelsLike(p);
+        });
+        const pointValue = (p, key, i) => key === 'feelsLike' ? feels[i] : finite(p[key]);
         const temps = pts.map(p => finite(p.temperature));
         const options = baseChartOptions(6);
         options.scales.y = {
@@ -515,21 +545,21 @@
           title: { display: true, text: "°C" },
           ticks: { maxTicksLimit: 6 }
         };
-        const fields = kind === 'today-dew' ? [['temperature','الحرارة','#ea8b2c'],['dewPoint','نقطة الندى','#258a74']] : kind === 'today-wind' ? [['windSpeed','الرياح','#3487c5'],['windGust','الهبات','#c77045']] : kind === 'today-humidity' ? [['humidity','الرطوبة','#3487c5']] : kind === 'today-pressure' ? [['pressure','الضغط','#916bc2']] : [['temperature','الحرارة','#ea8b2c']];
-        const values = pts.flatMap(p=>fields.map(f=>finite(p[f[0]]))).filter(v=>v!==null);
+        const fields = kind === 'today-dew' ? [['temperature','الحرارة','#ea8b2c'],['dewPoint','نقطة الندى','#258a74']] : kind === 'today-wind' ? [['windSpeed','الرياح','#3487c5'],['windGust','الهبات','#c77045']] : kind === 'today-humidity' ? [['humidity','الرطوبة','#3487c5']] : kind === 'today-pressure' ? [['pressure','الضغط','#916bc2']] : [['temperature','الحرارة','#ea8b2c'],['feelsLike','المحسوسة','#8299ad']];
+        const values = pts.flatMap((p,i)=>fields.map(f=>pointValue(p,f[0],i))).filter(v=>v!==null);
         options.scales.y = {...paddedRange(values,1), title:{display:true,text:kind==='today-humidity'?'%':kind==='today-wind'?'كم/س':kind==='today-pressure'?'hPa':'°C'}};
         spec = {
           type: "line",
           data: {
             labels: pts.map(p => new Date(p.observedAt).toLocaleTimeString("ar-SA-u-nu-latn", { timeZone: cfg.timeZone || "Asia/Riyadh", hour: "2-digit", minute: "2-digit", hour12: false })),
-            datasets: fields.map(([key,label,color])=>({label,data:pts.map(p=>finite(p[key])),borderColor:color,borderWidth:2,pointRadius:0,pointHitRadius:12,tension:.22,spanGaps:false}))
+            datasets: fields.map(([key,label,color])=>({label,data:pts.map((p,i)=>pointValue(p,key,i)),borderDash:key==='feelsLike'?[5,5]:[],borderColor:color,borderWidth:2,pointRadius:0,pointHitRadius:12,tension:.22,spanGaps:false}))
           },
           options
         };
         status.textContent = pts.length ? `قراءات اليوم: ${pts.length}` : "لا توجد بيانات كافية لليوم.";
       } else if (kind.startsWith("year-")) {
         const selectedYear = chartState.year;
-        data = await getJson(api(`/api/history/year?year=${selectedYear}`));
+        data = await getHistoryJson(api(`/api/history/year?year=${selectedYear}`), kind);
         if(requestVersion!==chartLoadVersion)return;
         const pts = (data.points || []).slice().sort((a,b) => Number(a.month) - Number(b.month));
         const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -568,12 +598,19 @@
       } else {
         const selectedYear = chartState.monthYear;
         const selectedMonth = chartState.month;
-        data = await getJson(api(`/api/history/month?year=${selectedYear}&month=${selectedMonth}`));
+        data = await getHistoryJson(api(`/api/history/month?year=${selectedYear}&month=${selectedMonth}`), kind);
         if(requestVersion!==chartLoadVersion)return;
         const raw = new Map((data.points || []).map(p=>[Number(p.day || p.date.slice(8,10)),p]));
         const lastDay=selectedYear===now.year&&selectedMonth===now.month?now.day:new Date(selectedYear,selectedMonth,0).getDate();
         const pts = Array.from({length:lastDay},(_,i)=>raw.get(i+1)||{day:i+1,tempAvg:null,dewPoint:null,tempHigh:null,tempLow:null});
         data.points=pts;
+        const feels = pts.map(p => {
+          if (finite(p.feelsLike) !== null) return finite(p.feelsLike);
+          const t = finite(p.temperature);
+          if (t === null || (t >= 27 && finite(p.humidity) === null) || (t <= 10 && finite(p.windSpeed) === null)) return null;
+          return calculatedFeelsLike(p);
+        });
+        const pointValue = (p, key, i) => key === 'feelsLike' ? feels[i] : finite(p[key]);
         const temps = pts.map(p => finite(p.tempAvg));
         const dews = pts.map(p => finite(p.dewPoint ?? p.dewPointAvg ?? p.dewptAvg));
         const options = baseChartOptions(8);
@@ -1086,6 +1123,15 @@
     const button = $("#chartPickerButton");
     const menu = $("#chartPickerMenu");
     if (!picker || !button || !menu) return;
+    const order = ['today-temp','today-dew','today-humidity','today-wind','today-pressure','month-temp','month-range','year-temp','year-stats'];
+    const entries = [...menu.querySelectorAll('[data-chart]')];
+    entries.sort((a,b) => {
+      const rank = el => { const k = el.dataset.chart; const i = order.indexOf(k); return i >= 0 ? i : k.startsWith('month-') ? 6 : k.startsWith('year-') ? 7 : 4; };
+      return rank(a) - rank(b);
+    }).forEach(el => menu.appendChild(el));
+    const thermal = entries.find(el => el.dataset.chart === 'today-temp');
+    if (thermal) thermal.textContent = 'المنحنى الحراري اليوم';
+    if (selectedChartKind === 'today-temp' && $('#chartPickerText')) $('#chartPickerText').textContent = 'المنحنى الحراري اليوم';
     button.addEventListener("click", () => {
       const opening = menu.hidden;
       menu.hidden = !opening;
@@ -1147,6 +1193,7 @@
       if (name==="radar") document.dispatchEvent(new CustomEvent("taqss:radar-open"));
       if (name==="markets") loadMarkets({silent:true});
     }
+    if (name === "history") refreshVisibleChart();
     if (name === "markets") startMarketsRefresh();
     updateStickyOffsets();
     syncWeatherRefresh();
