@@ -457,6 +457,20 @@
     document.dispatchEvent(new CustomEvent("taqss:weather-view", {detail: selectedWeatherView}));
     syncWeatherRefresh();
   }
+  let statsDateBubble=null, statsDateButton=null;
+  function closeStatsDate(){statsDateBubble?.remove();statsDateBubble=null;statsDateButton?.setAttribute('aria-expanded','false');statsDateButton=null;}
+  function toggleStatsDate(button,text){
+    const same=statsDateButton===button;closeStatsDate();if(same)return;
+    const box=document.createElement('div');box.className='stats-date-bubble';box.setAttribute('role','status');box.textContent=text;
+    document.body.append(box);statsDateBubble=box;statsDateButton=button;button.setAttribute('aria-expanded','true');
+    const r=button.getBoundingClientRect(),b=box.getBoundingClientRect();
+    box.style.left=Math.max(8,Math.min(r.left,innerWidth-b.width-8))+'px';
+    box.style.top=Math.max(8,Math.min(r.bottom+8+b.height<=innerHeight?r.bottom+8:r.top-b.height-8,innerHeight-b.height-8))+'px';
+  }
+  document.addEventListener('click',e=>{if(statsDateBubble&&!statsDateBubble.contains(e.target)&&!statsDateButton?.contains(e.target))closeStatsDate();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeStatsDate();});
+  window.addEventListener('resize',closeStatsDate);
+  document.addEventListener('taqss:tab-change',closeStatsDate);
   function destroyChart() { if (chart) { chart.destroy(); chart = null; } }
   function chartValues(values) { return values.map(finite).filter(v => v !== null); }
   function paddedRange(values, minPad = 1) {
@@ -507,6 +521,7 @@
 
   async function loadChart(kind) {
     chartLastAttempt = Date.now();
+    closeStatsDate();
     const requestVersion=++chartLoadVersion;
     ensureChartState();
     updatePeriodNav(kind);
@@ -531,8 +546,12 @@
           const n=finite(row.value);
           value.textContent=n===null ? '—' : `${row.unit==='يوم'?Math.round(n):n.toFixed(1)} ${row.unit || ''}`;
           date.textContent=row.date ? new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn',{day:'numeric',month:'long',year:'numeric',timeZone:'Asia/Riyadh'}).format(new Date(row.date+'T12:00:00Z')) : '—';
-          date.className='stats-date';
-          item.append(label,value,date);box.append(item);
+          if (row.date && !Number.isNaN(Date.parse(row.date+'T12:00:00Z'))) {
+            const info = document.createElement('button'); info.type='button'; info.className='stats-info'; info.textContent='ⓘ'; info.setAttribute('aria-label', `تاريخ ${label.textContent}`); info.setAttribute('aria-expanded','false');
+            info.addEventListener('click',event=>{event.stopPropagation();toggleStatsDate(info,date.textContent);});
+            value.append(' ',info);
+          }
+          item.append(label,value);box.append(item);
         }
         status.textContent = `${chartState.year} — ${data.coverage || ''}`; return;
       } else if (kind.startsWith("today-")) {
@@ -926,7 +945,7 @@
       const infoIcon = document.createElement('span'); infoIcon.className = 'markets-info-icon'; infoIcon.textContent = 'ⓘ'; infoIcon.setAttribute('aria-hidden','true'); delay.prepend(infoIcon, ' ');
       status.appendChild(delay);
       if (d.updatedAt) {
-        const separator = document.createElement('span'); separator.className = 'markets-footer-separator'; separator.textContent = '|'; separator.setAttribute('aria-hidden','true'); status.appendChild(separator);
+
         const update = document.createElement('span'); update.className = 'markets-last-reading';
         const clockIcon = document.createElement('span'); clockIcon.className = 'markets-clock-icon'; clockIcon.textContent = '◷'; clockIcon.setAttribute('aria-hidden','true');
         const time = document.createElement('bdi'); time.textContent = formatUpdateTime(d.updatedAt); update.setAttribute('aria-label', `آخر قراءة: ${formatUpdateTime(d.updatedAt)}`);
@@ -1139,6 +1158,8 @@
 
       const moonPhase = d.moon?.phase || approximateMoonPhase(now);
       moonPhaseEl.textContent = moonPhaseIcon(moonPhase);
+      const heading = moonPhaseEl.closest('.moon-heading');
+      if (heading) heading.dataset.phase = String(moonPhase).includes('محاق') ? 'new' : String(moonPhase).includes('بدر') ? 'full' : 'other';
       moonPhaseEl.removeAttribute("title");
       addRow(moonDl, "شكل القمر", moonPhase);
       addRow(moonDl, "الظهور", d.moon?.rise || "—");
@@ -1151,6 +1172,7 @@
       prayerCountdownTimer = null;
       status.textContent=`تعذر جلب أوقات الصلاة: ${e.message}`;
       moonPhaseEl.textContent = "🌙";
+      if(moonPhaseEl.closest(".moon-heading"))moonPhaseEl.closest(".moon-heading").dataset.phase="other";
       addRow(moonDl, "شكل القمر", "—");
       addRow(moonDl, "الظهور", "—");
       addRow(moonDl, "الغروب", "—");

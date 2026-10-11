@@ -16,7 +16,7 @@
   const fmt = number => Number(number).toLocaleString('ar-SA');
   function setStatus(message) {const el=$('#mushafLoadStatus'); el.textContent=message; el.hidden=!message;}
   function saved(key, fallback){try{return JSON.parse(localStorage.getItem(key)) ?? fallback;}catch{return fallback;}}
-  function saveSettings(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({mode:state.mode,showFrame:state.showFrame,fontSize:state.fontSize,font:state.font,surah:state.cursor.surah,ayah:state.cursor.ayah,token:state.cursor.token||0,reciter:state.reciter,repeat:state.repeat}));}catch{}}
+  function saveSettings(){if(!state.ready)return;try{localStorage.setItem(STORAGE_KEY,JSON.stringify({mode:state.mode,showFrame:state.showFrame,fontSize:state.fontSize,font:state.font,surah:state.cursor.surah,ayah:state.cursor.ayah,token:state.cursor.token||0,reciter:state.reciter,repeat:state.repeat}));}catch{}}
   function verseAt(c){return state.surahs.get(c.surah)?.[c.ayah-1] || null;}
   function validCursor(c){
     const s=Number(c?.surah), a=Number(c?.ayah), token=Number(c?.token||0);
@@ -946,11 +946,14 @@
       $('#mushafSavePlace').disabled=false;$('#mushafResume').disabled=false;
       const start=Number.isInteger(settings.surah)&&settings.surah>=1&&settings.surah<=114?settings.surah:1;
       const startAyah=Number.isInteger(settings.ayah)&&state.surahs.get(start)?.[settings.ayah-1]?settings.ayah:1;
-      state.cursor={surah:start,ayah:startAyah,token:0};state.pendingScroll=false;
+      state.cursor=validCursor({surah:start,ayah:startAyah,token:settings.token||0})||{surah:start,ayah:startAyah,token:0};state.pendingScroll=false;
+      saveSettings();
       state.audioSurah=start;state.audioAyah=startAyah;
       syncAudioUI();setStatus('');scheduleRender();
       document.fonts?.ready.then(scheduleRender).catch(()=>{});
     }catch(error){setStatus(`تعذّر تحميل بيانات المصحف: ${error.message}. تأكد من تشغيل الخادم ووجود الملف الرسمي.`);console.error('Mushaf official data:',error);}
   }
+  window.addEventListener('pagehide',saveSettings);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)saveSettings();});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

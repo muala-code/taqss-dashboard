@@ -797,3 +797,19 @@ html, body { touch-action: pan-x pan-y; }
 .place-story p {margin:.3rem 0;font-size:.95rem;}
 .place-story a {font-size:.8rem;color:#2563b8;text-underline-offset:.2rem;}
 @media (prefers-color-scheme:dark) {.place-brand strong {color:#90d0b8;} .place-story a {color:#8bbaff;}}
+
+/* Final readability repairs. */
+#panel-markets .markets-footer {font-size:.9rem;flex-wrap:wrap;gap:.35rem .9rem;white-space:normal;line-height:1.8;}
+#panel-markets .markets-delay-note,#panel-markets .markets-last-reading {display:inline-flex;align-items:center;gap:.3rem;}
+#panel-markets .markets-info-icon,#panel-markets .markets-clock-icon {font-size:1.15rem;line-height:1;display:inline-flex;width:1.25rem;justify-content:center;}
+#panel-prayer .prayer-section,#panel-prayer .moon-section {background:color-mix(in srgb,#7fa99b 7%,Canvas);border:1px solid color-mix(in srgb,currentColor 18%,Canvas);border-radius:.6rem;padding:.65rem .7rem;}
+#panel-prayer .prayer-table {background:transparent;border:0;padding:0;}
+#panel-prayer .moon-heading {padding:.35rem .5rem;border-radius:.35rem;}
+#panel-prayer .moon-heading[data-phase="new"] {background:color-mix(in srgb,#000 9%,Canvas);}
+#panel-prayer .moon-heading[data-phase="full"] {background:color-mix(in srgb,#facc15 17%,Canvas);}
+#historyStats {width:100%;font-size:1rem;line-height:1.65;}
+#historyStats th,#historyStats td {padding:.7rem .45rem;}
+#historyStats tbody th {font-weight:650;text-align:right;}
+#historyStats tbody td {font-weight:700;white-space:nowrap;}
+.stats-info {border:0;background:transparent;color:#347c91;font-size:1.1rem;cursor:pointer;padding:.2rem .3rem;vertical-align:middle;}
+.stats-date-bubble {position:fixed;z-index:2100;max-width:calc(100vw - 16px);box-sizing:border-box;padding:.65rem .85rem;background:Canvas;color:CanvasText;border:1px solid #9aafb4;border-radius:.5rem;box-shadow:0 4px 16px #0002;direction:rtl;font-size:1rem;}
