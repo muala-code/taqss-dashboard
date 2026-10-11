@@ -759,3 +759,13 @@ html, body { touch-action: pan-x pan-y; }
 #panel-markets .market-cards .market-name {justify-self:stretch;text-align:center;font-weight:750;padding:.5rem .3rem;border-bottom:1px solid color-mix(in srgb,currentColor 12%,transparent);}
 #panel-markets .market-cards .num {justify-self:stretch!important;padding:.45rem .2rem;text-align:center!important;}
 #panel-markets .market-cards .num:nth-child(2) {border-inline-end:1px solid color-mix(in srgb,currentColor 12%,transparent);}
+
+/* Subtle direction tint and clearer footer. */
+#panel-markets .market-cards .market-item {border-color:color-mix(in srgb,currentColor 29%,transparent);}
+#panel-markets .market-cards .market-card-up {background:color-mix(in srgb,#16a34a 5%,Canvas);border-color:color-mix(in srgb,#15803d 35%,Canvas);}
+#panel-markets .market-cards .market-card-down {background:color-mix(in srgb,#dc2626 5%,Canvas);border-color:color-mix(in srgb,#b91c1c 35%,Canvas);}
+#panel-markets .market-cards .market-card-flat {background:color-mix(in srgb,#888 5%,Canvas);}
+#panel-markets .markets-footer {opacity:1;font-size:.86rem;line-height:1.65;display:flex;flex-wrap:wrap;justify-content:center;gap:.15rem .7rem;}
+#panel-markets .markets-delay-note {color:color-mix(in srgb,CanvasText 75%,Canvas);}
+#panel-markets .markets-last-reading {color:#2563b8;font-weight:650;}
+@media (prefers-color-scheme:dark) {#panel-markets .markets-last-reading {color:#8bbaff;}}

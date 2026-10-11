@@ -879,7 +879,7 @@
           const cls = marketDirection(q);
           const pct = finite(q.changePercent);
           const change = finite(q.change);
-          const itemWrap = document.createElement("div"); itemWrap.className = "market-item";
+          const itemWrap = document.createElement("div"); itemWrap.className = `market-item market-card-${cls || "flat"}`;
           const row = document.createElement("div"); row.className = `market-row ${key === "index" ? "index-row" : ""}`.trim();
           if (key === "index") {
             row.innerHTML = `<span class="market-name"></span><span class="num market-index-value ${cls}">${fmt(q.price,2)}</span><span class="num ${cls}">${pct === null ? "—" : marketSigned(pct,"%")}</span>`;
@@ -911,7 +911,14 @@
       }
       root.replaceChildren(frag);
       if (root.querySelector(".market-cards")) root.querySelector(".market-cards").scrollTop = scrollTop;
-      status.textContent = d.updatedAt ? `الأسعار متأخرة · آخر تحديث: ${formatUpdateTime(d.updatedAt)}` : "الأسعار متأخرة";
+      status.replaceChildren();
+      const delay = document.createElement('span'); delay.className = 'markets-delay-note'; delay.textContent = 'الأسعار قد تكون متأخرة';
+      status.appendChild(delay);
+      if (d.updatedAt) {
+        const update = document.createElement('span'); update.className = 'markets-last-reading';
+        update.textContent = `آخر قراءة: ${formatUpdateTime(d.updatedAt)}`;
+        status.appendChild(update);
+      }
     } catch (e) { status.textContent = `تعذر جلب الأسعار: ${e.message}`; }
     finally { marketsLoading = false; if (stockRefreshPending) { stockRefreshPending = false; loadMarkets({silent:true}); } }
   }
