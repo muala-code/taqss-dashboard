@@ -1290,7 +1290,7 @@
   $$(".tab").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
   $("#chartPrev").addEventListener("click",()=>moveChartPeriod(-1));
   $("#chartNext").addEventListener("click",()=>moveChartPeriod(1));
-  const initial=["weather","history","radar","prayer","mushaf","markets","quiz"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "weather";
+  const initial=["weather","history","radar","prayer","mushaf","markets","quiz","place"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "weather";
   showTab(initial);
 })();
 

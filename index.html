@@ -4,10 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
   <meta name="theme-color" content="#ffffff">
-  <title>طقس داشبورد</title>
+  <title>نوافذ | الطقس والمعرفة وخدمات يومك</title>
+  <meta name="description" content="نوافذ على الطقس والمعرفة وخدمات يومك؛ محطة قرب أبيار الماشي، وأوقات الصلاة والمصحف والأسعار والمسابقة.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌡️</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=0.24.8.4-market-cards">
+  <link rel="stylesheet" href="styles.css?v=0.24.9-nawafidh">
   <link rel="stylesheet" href="mushaf.css?v=0.24.6.4">
 </head>
 <body>
@@ -19,6 +20,7 @@
     <button class="tab" data-tab="mushaf">📖 المصحف</button>
     <button class="tab" data-tab="markets">💹 الأسعار</button>
     <button class="tab" data-tab="quiz">🏆 المسابقة</button>
+    <button class="tab" data-tab="place">📍 عن المكان</button>
   </nav>
 
   <main>
@@ -240,13 +242,25 @@
       <button id="quizStart" class="quiz-start" type="submit" form="quizSetup">ابدأ المسابقة</button>
       <p id="quizStatus" role="status"></p><div id="quizPlay" hidden></div><div id="quizResult" hidden></div>
     </section>
+
+    <section id="panel-place" class="panel" hidden aria-labelledby="placeTitle">
+      <div class="place-brand"><strong>نوافذ</strong><p>نوافذ على الطقس والمعرفة وخدمات يومك</p></div>
+      <article class="place-story">
+        <h2 id="placeTitle">أبيار الماشي</h2>
+        <p class="place-lead">نافذة على المكان الذي نتابع طقسه؛ وعلى ما يربطه بجغرافية المدينة المنورة وتاريخها.</p>
+        <section><h3>المكان اليوم</h3><p>أبيار الماشي مركز إداري يتبع المدينة المنورة، يقع إلى الجنوب الغربي منها. وتذكر سعوديبيديا أنه يبعد عنها نحو 35 كيلومترًا، ويمكن الوصول إليه عبر طريق الهجرة الفرعي ثم الطريق رقم 15.</p><a href="https://saudipedia.com/مركز-أبيار-الماشي" target="_blank" rel="noopener noreferrer">المصدر: سعوديبيديا — مركز أبيار الماشي</a></section>
+        <section><h3>في الذاكرة التاريخية</h3><p>تعرض موسوعة معالم بئر الماشي ضمن المواضع التاريخية جنوب المدينة، وترجّح صلتها بموضع «قَلَهى» الذي تذكره المراجع في أخبار اعتزال سعد بن أبي وقاص رضي الله عنه أيام الفتنة. وهذا الربط ترجيح تاريخي، وقد اختلف الباحثون في تحديد بعض الأسماء القديمة؛ لذا لا نقدمه باعتباره أمرًا محسومًا.</p><a href="https://mawsoat-maealim.sa/places/23" target="_blank" rel="noopener noreferrer">المصدر: موسوعة معالم — أبيار الماشي</a></section>
+        <section><h3>نافذة على وادي العقيق</h3><p>تذكر سعوديبيديا وادي العقيق ضمن المعالم الطبيعية القريبة من المركز. وللوادي مكانة في تاريخ المدينة المنورة؛ فقد عرفت ضفافه قصورًا تاريخية، منها قصر عروة وقصر سعد بن أبي وقاص. هذه معالم للوادي ومحيطه، وليست جميعها داخل أبيار الماشي.</p><a href="https://saudipedia.com/وادي-العقيق-في-المدينة-المنورة" target="_blank" rel="noopener noreferrer">المصدر: سعوديبيديا — وادي العقيق</a></section>
+        <section><h3>لماذا نتابع طقس هذا المكان؟</h3><p>تعرض «نوافذ» قراءات محطة طقس شخصية قرب أبيار الماشي، لتقريب متابعة الحرارة والرطوبة والرياح والمطر من واقع المكان. وتجمع معها أوقات الصلاة والمصحف والأسعار والمسابقة؛ كل تبويب نافذة مختلفة في منصة واحدة.</p></section>
+      </article>
+    </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="config.js?v=0.20.1"></script>
   <script src="markets-config.js?v=0.24.6"></script>
-  <script src="app.js?v=0.24.8.4-market-cards"></script>
+  <script src="app.js?v=0.24.9-nawafidh"></script>
   <script src="satellite.js?v=0.24.7-satellite"></script>
   <script src="radar.js?v=0.20.1"></script>
   <script src="mushaf.js?v=0.24.6.4"></script>

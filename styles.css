@@ -784,3 +784,16 @@ html, body { touch-action: pan-x pan-y; }
 #panel-markets .markets-clock-icon {color:#2563b8;}
 .stock-currency {font-size:.65rem;font-weight:400;}
 @media (prefers-color-scheme:dark) {#panel-markets .markets-info-icon {color:#fca5a5;} #panel-markets .markets-clock-icon {color:#8bbaff;}}
+
+/* Nوافذ: static place story. */
+.place-brand {text-align:center;padding:.9rem .5rem;border-bottom:1px solid color-mix(in srgb,currentColor 14%,transparent);}
+.place-brand strong {font-size:1.65rem;color:#225c4b;}
+.place-brand p {margin:.35rem 0;font-size:.85rem;opacity:.8;}
+.place-story {max-width:48rem;margin:auto;line-height:1.9;}
+.place-story h2 {margin:1rem 0 .35rem;font-size:1.4rem;}
+.place-lead {opacity:.8;margin-top:0;}
+.place-story section {margin:1rem 0;padding:.85rem 1rem;border:1px solid color-mix(in srgb,currentColor 15%,transparent);border-radius:.6rem;}
+.place-story h3 {margin:0 0 .3rem;font-size:1.05rem;}
+.place-story p {margin:.3rem 0;font-size:.95rem;}
+.place-story a {font-size:.8rem;color:#2563b8;text-underline-offset:.2rem;}
+@media (prefers-color-scheme:dark) {.place-brand strong {color:#90d0b8;} .place-story a {color:#8bbaff;}}
