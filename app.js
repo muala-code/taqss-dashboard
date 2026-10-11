@@ -750,7 +750,11 @@
   }
   document.addEventListener('click', e => { if (marketPopover && !marketPopover.contains(e.target) && !marketPopoverAnchor?.contains(e.target)) closeMarketPopover(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && marketPopover) { const row = marketPopoverAnchor; closeMarketPopover(); row?.focus({preventScroll:true}); } });
-  document.addEventListener('scroll', closeMarketPopover, true);
+  function handleMarketPopoverScroll(event) {
+    const target = event.target;
+    if (target === document || target === document.documentElement || target === document.body || target?.classList?.contains('market-cards')) closeMarketPopover();
+  }
+  document.addEventListener('scroll', handleMarketPopoverScroll, true);
   window.addEventListener('resize', closeMarketPopover);
   document.addEventListener('taqss:tab-change', closeMarketPopover);
   function buildMarketDetails(q) {

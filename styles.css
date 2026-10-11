@@ -753,3 +753,9 @@ html, body { touch-action: pan-x pan-y; }
 .stock-add-dialog button {padding:.45rem .8rem;cursor:pointer;}
 @media (min-width:600px) {#panel-markets .market-cards {grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));}}
 @media (orientation:landscape) and (max-height:500px) {#panel-markets .market-cards {max-height:45dvh;}}
+
+/* Centered card heading and subtle cell dividers. */
+#panel-markets .market-cards .market-row {gap:0;padding:0;}
+#panel-markets .market-cards .market-name {justify-self:stretch;text-align:center;font-weight:750;padding:.5rem .3rem;border-bottom:1px solid color-mix(in srgb,currentColor 12%,transparent);}
+#panel-markets .market-cards .num {justify-self:stretch!important;padding:.45rem .2rem;text-align:center!important;}
+#panel-markets .market-cards .num:nth-child(2) {border-inline-end:1px solid color-mix(in srgb,currentColor 12%,transparent);}
