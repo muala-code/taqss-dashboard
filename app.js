@@ -10,7 +10,12 @@
     })).filter(x => x.symbol && x.name);
   }
   function initialMarkets() {
-    return cloneMarkets(window.TAQSS_MARKETS || []);
+    const base = cloneMarkets(window.TAQSS_MARKETS || []);
+    try {
+      const saved = cloneMarkets(JSON.parse(localStorage.getItem('taqss-added-stocks') || '[]'));
+      for (const item of saved) if (/^\d{4}\.SR$/.test(item.symbol) && !base.some(x => x.symbol.toUpperCase() === item.symbol.toUpperCase())) base.push({...item, category:'stock', enabled:true});
+    } catch (_) {}
+    return base;
   }
   let marketsCfg = initialMarkets();
   const activeMarkets = () => marketsCfg.filter(x => x.enabled !== false);
@@ -683,20 +688,71 @@
     return n.toLocaleString("ar-SA-u-nu-latn", { maximumFractionDigits: 0 });
   }
   function buildMarketHeader(title) {
-    const head = document.createElement("div"); head.className = "market-group-heading";
-    const h = document.createElement("h3"); h.textContent = title; head.appendChild(h);
-    const wrap = document.createElement("span"); wrap.className = "info-wrap";
-    const button = document.createElement("button"); button.type = "button"; button.className = "info-button";
-    button.textContent = "ⓘ"; button.setAttribute("aria-label", "معلومات تأخر الأسعار"); button.setAttribute("aria-expanded", "false");
-    const bubble = document.createElement("span"); bubble.className = "info-bubble market-delay-info"; bubble.hidden = true;
-    bubble.textContent = "الأسعار قد تكون متأخرة؛ مدة التأخير بالدقائق غير محددة من المصدر.";
-    bubble.setAttribute("role", "status");
-    button.addEventListener("click", event => { event.stopPropagation(); bubble.hidden = !bubble.hidden; button.setAttribute("aria-expanded", String(!bubble.hidden)); });
-    wrap.addEventListener("keydown", event => { if (event.key === "Escape") { bubble.hidden = true; button.setAttribute("aria-expanded", "false"); button.focus(); } });
-    head.addEventListener("focusout", event => { if (!head.contains(event.relatedTarget)) { bubble.hidden = true; button.setAttribute("aria-expanded", "false"); } });
-    wrap.append(button, bubble); head.appendChild(wrap);
-    return head;
+    const head = document.createElement('div'); head.className = 'market-group-heading';
+    const h = document.createElement('h3'); h.textContent = 'أسهم مختارة';
+    const add = document.createElement('button'); add.type = 'button'; add.className = 'market-add'; add.textContent = '+';
+    add.setAttribute('aria-label', 'إضافة سهم'); add.addEventListener('click', openAddStock);
+    head.append(h, add); return head;
   }
+  function openAddStock() {
+    if (document.querySelector('.stock-add-dialog')) return;
+    const dialog = document.createElement('dialog'); dialog.className = 'stock-add-dialog';
+    dialog.innerHTML = `<form><h3>إضافة سهم</h3><label>رمز السهم السعودي<input name="symbol" inputmode="numeric" maxlength="4" placeholder="4190" required pattern="[0-9]{4}"></label><label>اسم العرض (اختياري)<input name="name" maxlength="40"></label><p>يُحفظ على هذا الجهاز.</p><p class="stock-add-status" role="status"></p><div><button type="submit">إضافة</button><button type="button" class="stock-add-cancel">إلغاء</button></div></form>`;
+    document.body.append(dialog);
+    dialog.addEventListener('close', () => dialog.remove());
+    dialog.querySelector('.stock-add-cancel').onclick = () => dialog.close();
+    dialog.querySelector('form').onsubmit = async e => {
+      e.preventDefault();
+      const form = e.currentTarget, status = form.querySelector('.stock-add-status');
+      const symbol = form.elements.symbol.value.trim() + '.SR';
+      if (!/^\d{4}\.SR$/.test(symbol)) { status.textContent = 'أدخل رمزًا من أربعة أرقام.'; return; }
+      if (marketsCfg.some(x => x.symbol.toUpperCase() === symbol)) { status.textContent = 'السهم موجود بالفعل في القائمة.'; return; }
+      const submit = form.querySelector('[type="submit"]'); submit.disabled = true; status.textContent = 'جارٍ التحقق…';
+      try {
+        const data = await getJson(`${dashboardBase()}/api/markets?symbols=${encodeURIComponent(symbol)}`);
+        const quote = (data.items || []).find(x => x.symbol === symbol);
+        if (!quote || finite(quote.price) === null) throw new Error('تعذر التحقق من السهم، حاول لاحقًا.');
+        const item = {symbol, name:form.elements.name.value.trim() || quote.name || symbol.slice(0,4), category:'stock', enabled:true};
+        let saved;
+        try { saved = cloneMarkets(JSON.parse(localStorage.getItem('taqss-added-stocks') || '[]')); } catch (_) { saved = []; }
+        saved = saved.filter(x => x.symbol !== symbol); saved.push(item);
+        let persisted = true;
+        try { localStorage.setItem('taqss-added-stocks', JSON.stringify(saved)); } catch (_) { persisted = false; }
+        marketsCfg.push(item);
+        if (!persisted) { status.textContent = 'أُضيف للعرض الحالي، لكن تعذر حفظه على الجهاز.'; submit.hidden = true; }
+        else dialog.close();
+        if (marketsLoading) stockRefreshPending = true; else loadMarkets({silent:true});
+      } catch (err) { status.textContent = err.message; }
+      finally { submit.disabled = false; }
+    };
+    dialog.showModal();
+  }
+  let stockRefreshPending = false;
+  let marketPopover = null, marketPopoverAnchor = null;
+  function closeMarketPopover() {
+    marketPopover?.remove(); marketPopover = null;
+    marketPopoverAnchor?.setAttribute('aria-expanded','false'); marketPopoverAnchor = null;
+    openMarketSymbol = null;
+  }
+  function showMarketPopover(row, item, quote) {
+    const same = marketPopoverAnchor === row; closeMarketPopover(); if (same) return;
+    const box = document.createElement('div'); box.className = 'market-popover'; box.setAttribute('role','dialog'); box.setAttribute('aria-label', `تفاصيل ${item.name}`);
+    const header = document.createElement('div'); header.className = 'market-popover-heading';
+    const title = document.createElement('strong'); title.textContent = item.name;
+    const close = document.createElement('button'); close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label','إغلاق التفاصيل');
+    close.onclick = () => { closeMarketPopover(); row.focus({preventScroll:true}); };
+    header.append(title,close); const details = buildMarketDetails(quote); details.hidden = false;
+    box.append(header,details); document.body.append(box);
+    marketPopover = box; marketPopoverAnchor = row; row.setAttribute('aria-expanded','true'); openMarketSymbol = item.symbol;
+    const r = row.getBoundingClientRect(), b = box.getBoundingClientRect();
+    box.style.left = Math.max(8, Math.min(r.left, innerWidth - b.width - 8)) + 'px';
+    box.style.top = Math.max(8, Math.min(r.bottom + b.height + 8 <= innerHeight ? r.bottom + 8 : r.top - b.height - 8, innerHeight - b.height - 8)) + 'px';
+  }
+  document.addEventListener('click', e => { if (marketPopover && !marketPopover.contains(e.target) && !marketPopoverAnchor?.contains(e.target)) closeMarketPopover(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && marketPopover) { const row = marketPopoverAnchor; closeMarketPopover(); row?.focus({preventScroll:true}); } });
+  document.addEventListener('scroll', closeMarketPopover, true);
+  window.addEventListener('resize', closeMarketPopover);
+  document.addEventListener('taqss:tab-change', closeMarketPopover);
   function buildMarketDetails(q) {
     const details = document.createElement("div"); details.className = "market-details"; details.hidden = true;
     const fields = [
@@ -804,6 +860,8 @@
       const symbols = visible.map(x => x.symbol).join(",");
       const d = await getJson(`${base}/api/markets?symbols=${encodeURIComponent(symbols)}`);
       const bySymbol = new Map((d.items || []).map(x => [x.symbol, x]));
+      const scrollTop = root.querySelector(".market-cards")?.scrollTop || 0;
+      closeMarketPopover();
       const frag = document.createDocumentFragment();
       const referenceItems = visible.filter(x => x.category === "index" || x.category === "commodity");
       if (referenceItems.length) frag.appendChild(buildIndexTicker(referenceItems, bySymbol));
@@ -811,6 +869,7 @@
       for (const [key,title] of groups) {
         const section = document.createElement("section"); section.className="market-group";
         section.appendChild(buildMarketHeader(title));
+        const cards = document.createElement("div"); cards.className = "market-cards"; cards.setAttribute("aria-label", "الأسهم المختارة"); cards.tabIndex = 0; section.appendChild(cards);
         for (const item of visible.filter(x=>x.category===key)) {
           const q = bySymbol.get(item.symbol) || {};
           const cls = marketDirection(q);
@@ -819,47 +878,38 @@
           const itemWrap = document.createElement("div"); itemWrap.className = "market-item";
           const row = document.createElement("div"); row.className = `market-row ${key === "index" ? "index-row" : ""}`.trim();
           if (key === "index") {
-            row.innerHTML = `<span class="market-name">${item.name}</span><span class="num market-index-value ${cls}">${fmt(q.price,2)}</span><span class="num ${cls}">${pct === null ? "—" : marketSigned(pct,"%")}</span>`;
+            row.innerHTML = `<span class="market-name"></span><span class="num market-index-value ${cls}">${fmt(q.price,2)}</span><span class="num ${cls}">${pct === null ? "—" : marketSigned(pct,"%")}</span>`;
           } else {
             // Three columns only: name | last price | colored percent.
-            row.innerHTML = `<span class="market-name">${item.name}</span><span class="num ${cls}">${marketFixed(q.price)}</span><span class="num ${cls}">${pct === null ? "—" : marketSigned(pct,"%")}</span>`;
+            row.innerHTML = `<span class="market-name"></span><span class="num ${cls}">${marketFixed(q.price)}</span><span class="num ${cls}">${pct === null ? "—" : marketSigned(pct,"%")}</span>`;
             if (key === "stock" || key === "commodity") {
               row.classList.add("stock-row", "market-expandable-row");
               row.tabIndex = 0; row.setAttribute("role", "button");
               row.setAttribute("aria-label", `${item.name}، عرض التفاصيل`);
-              const details = buildMarketDetails(q);
-              const isOpen = openMarketSymbol === item.symbol;
-              details.hidden = !isOpen;
-              row.setAttribute("aria-expanded", isOpen ? "true" : "false");
-              itemWrap.append(row, details);
-              const toggle = () => {
-                const willOpen = details.hidden;
-                root.querySelectorAll(".market-details").forEach(el => { el.hidden = true; });
-                root.querySelectorAll(".market-expandable-row[aria-expanded=\"true\"]").forEach(el => el.setAttribute("aria-expanded", "false"));
-                if (willOpen) {
-                  details.hidden = false;
-                  row.setAttribute("aria-expanded", "true");
-                  openMarketSymbol = item.symbol;
-                } else {
-                  openMarketSymbol = null;
-                }
-              };
-              row.addEventListener("click", toggle);
-              row.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+              row.setAttribute('aria-expanded','false');
+              row.querySelector('.market-name').textContent = item.name;
+              itemWrap.append(row);
+              let press = null, moved = false;
+              row.addEventListener('pointerdown', e => { press = {x:e.clientX,y:e.clientY}; moved = false; });
+              row.addEventListener('pointermove', e => { if (press && Math.hypot(e.clientX-press.x,e.clientY-press.y)>8) moved = true; });
+              row.addEventListener('pointercancel', () => { moved = true; });
+              row.addEventListener('click', () => { if (!moved) showMarketPopover(row,item,q); press = null; });
+              row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showMarketPopover(row,item,q); } });
               addMarketFlash(row, item.symbol, q.price);
-              section.appendChild(itemWrap);
+              cards.appendChild(itemWrap);
               continue;
             }
           }
           addMarketFlash(row, item.symbol, q.price);
-          itemWrap.appendChild(row); section.appendChild(itemWrap);
+          itemWrap.appendChild(row); cards.appendChild(itemWrap);
         }
         frag.appendChild(section);
       }
       root.replaceChildren(frag);
-      status.textContent = d.updatedAt ? `آخر تحديث: ${formatUpdateTime(d.updatedAt)}` : "";
+      if (root.querySelector(".market-cards")) root.querySelector(".market-cards").scrollTop = scrollTop;
+      status.textContent = d.updatedAt ? `الأسعار متأخرة · آخر تحديث: ${formatUpdateTime(d.updatedAt)}` : "الأسعار متأخرة";
     } catch (e) { status.textContent = `تعذر جلب الأسعار: ${e.message}`; }
-    finally { marketsLoading = false; }
+    finally { marketsLoading = false; if (stockRefreshPending) { stockRefreshPending = false; loadMarkets({silent:true}); } }
   }
 
   let marketsTimer = null;
