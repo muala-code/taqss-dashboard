@@ -13,7 +13,7 @@
     if(map) return true;
     if(!window.L){ message("تعذر تحميل مكتبة الخريطة."); return false; }
     const root=$("#weatherLeafletMap"); if(!root) return false;
-    map=L.map(root,{center:[LAT,LON],zoom:7,minZoom:3,maxZoom:18,zoomControl:true,attributionControl:true,scrollWheelZoom:false});
+    map=L.map(root,{center:[LAT,LON],zoom:7,minZoom:3,maxZoom:18,zoomControl:true,attributionControl:true,scrollWheelZoom:false,touchZoom:true});
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:"© OpenStreetMap"}).addTo(map);
     L.marker([LAT,LON],{icon:L.divIcon({className:"",html:'<span class="station-map-marker" aria-hidden="true"></span>',iconSize:[12,12],iconAnchor:[6,6]}),title:"موقع المحطة",keyboard:false,zIndexOffset:1000}).addTo(map);
     return true;

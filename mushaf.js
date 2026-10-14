@@ -471,7 +471,7 @@
     {id:'maher',name:'ماهر المعيقلي',folder:'Maher_AlMuaiqly_64kbps'},
     {id:'ali',name:'علي جابر',timed:true,readId:76},
     {id:'hudhaify',name:'علي الحذيفي',folder:'Hudhaify_128kbps'},
-    {id:'akhdar',name:'إبراهيم الأخضر',folder:'Ibrahim_Akhdar_64kbps'},
+    {id:'akhdar',name:'إبراهيم الأخضر',folder:'Ibrahim_Akhdar_32kbps'},
     {id:'khayyat',name:'عبدالله خياط',timed:true,readId:61},
     {id:'juhany',name:'عبدالله الجهني',folder:'Abdullaah_3awwaad_Al-Juhaynee_128kbps'},
     {id:'ghamdi',name:'سعد الغامدي',folder:'Ghamadi_40kbps'},

@@ -941,17 +941,17 @@
       root.replaceChildren(frag);
       if (root.querySelector(".market-cards")) root.querySelector(".market-cards").scrollTop = scrollTop;
       status.replaceChildren();
-      const delay = document.createElement('span'); delay.className = 'markets-delay-note'; delay.appendChild(document.createTextNode('الأسعار قد تكون متأخرة'));
-      const infoIcon = document.createElement('span'); infoIcon.className = 'markets-info-icon'; infoIcon.textContent = 'ⓘ'; infoIcon.setAttribute('aria-hidden','true'); delay.prepend(infoIcon, ' ');
-      status.appendChild(delay);
-      if (d.updatedAt) {
-
-        const update = document.createElement('span'); update.className = 'markets-last-reading';
-        const clockIcon = document.createElement('span'); clockIcon.className = 'markets-clock-icon'; clockIcon.textContent = '◷'; clockIcon.setAttribute('aria-hidden','true');
-        const time = document.createElement('bdi'); time.textContent = formatUpdateTime(d.updatedAt); update.setAttribute('aria-label', `آخر قراءة: ${formatUpdateTime(d.updatedAt)}`);
-        update.append(clockIcon, ' ', time);
-        status.appendChild(update);
+      const footerLine = text => {const line=document.createElement('span');line.className='markets-note-line';line.textContent=text;status.appendChild(line);return line;};
+      footerLine('• ملاحظة: الأسعار متأخرة.');
+      if (d.updatedAt && !Number.isNaN(Date.parse(d.updatedAt))) {
+        const line=footerLine('• تاريخ التحديث: '),date=new Date(d.updatedAt);
+        const time=document.createElement('bdi');time.className='markets-update-time';
+        time.textContent=new Intl.DateTimeFormat('en-GB',{timeZone:cfg.timeZone||'Asia/Riyadh',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(date);
+        const day=document.createElement('bdi');day.textContent=new Intl.DateTimeFormat('en-GB',{timeZone:cfg.timeZone||'Asia/Riyadh',day:'2-digit',month:'2-digit',year:'numeric'}).format(date);
+        line.append(time,' — ',day);
       }
+      footerLine('• يمكن إضافة أسهم أخرى للاطلاع عليها؛ تُحفظ على هذا الجهاز فقط، ولا تُحفظ على الشبكة.');
+      footerLine('• عرض أسعار الأسهم هنا نافذة اقتصادية للاطلاع، ولا يعني دعوة للدخول فيها.');
     } catch (e) { status.textContent = `تعذر جلب الأسعار: ${e.message}`; }
     finally { marketsLoading = false; if (stockRefreshPending) { stockRefreshPending = false; loadMarkets({silent:true}); } }
   }

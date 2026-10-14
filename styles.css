@@ -813,3 +813,21 @@ html, body { touch-action: pan-x pan-y; }
 #historyStats tbody td {font-weight:700;white-space:nowrap;}
 .stats-info {border:0;background:transparent;color:#347c91;font-size:1.1rem;cursor:pointer;padding:.2rem .3rem;vertical-align:middle;}
 .stats-date-bubble {position:fixed;z-index:2100;max-width:calc(100vw - 16px);box-sizing:border-box;padding:.65rem .85rem;background:Canvas;color:CanvasText;border:1px solid #9aafb4;border-radius:.5rem;box-shadow:0 4px 16px #0002;direction:rtl;font-size:1rem;}
+
+/* Stable stock heading; directional tint remains below it. */
+#panel-markets .market-cards .market-name {background:#f0f1f2;color:#17212a;}
+#panel-markets .markets-footer {display:block;text-align:right;font-size:.9rem;line-height:1.8;white-space:normal;color:CanvasText;}
+#panel-markets .markets-note-line {display:block;margin:.25rem 0;font-weight:400;}
+#panel-markets .markets-update-time {color:#2563b8;font-weight:650;}
+/* Page gestures scroll only; radar/satellite own their internal zoom. */
+html,body {touch-action:pan-x pan-y;}
+#weatherLeafletMap,.satellite-picture:fullscreen,.satellite-picture.satellite-full {touch-action:none;}
+.nawafidh-native-select {display:none!important;}
+.nawafidh-picker-button {width:100%;min-width:0;display:flex;justify-content:space-between;gap:.5rem;align-items:center;background:Canvas;color:CanvasText;border:1px solid #b8c4cd;border-radius:.4rem;padding:.45rem .6rem;font:inherit;text-align:right;cursor:pointer;}
+.nawafidh-picker-button:disabled {opacity:.45;cursor:default;}
+.nawafidh-picker-menu {position:fixed;z-index:110000;box-sizing:border-box;padding:.3rem;max-height:55dvh;overflow-y:auto;background:Canvas;color:CanvasText;border:1px solid #a8b8c0;border-radius:.5rem;box-shadow:0 5px 18px #0002;direction:rtl;}
+.nawafidh-picker-menu button {display:block;width:100%;padding:.65rem .7rem;text-align:right;font:inherit;color:inherit;background:transparent;border:0;border-radius:.25rem;cursor:pointer;}
+.nawafidh-picker-menu button[aria-selected=true] {background:#e4f0eb;color:#155b44;font-weight:700;}
+.nawafidh-picker-menu button:disabled {opacity:.4;}
+.nawafidh-picker-menu button:focus-visible,.nawafidh-picker-button:focus-visible {outline:2px solid #398a83;outline-offset:-2px;}
+@media(prefers-color-scheme:dark){#panel-markets .markets-update-time{color:#8bbaff;}}
