@@ -118,7 +118,7 @@
     const raw = d?.rawObservation || {};
     const precipRate = finite(raw?.metric?.precipRate ?? raw?.imperial?.precipRate ?? d?.precipRate);
     const rain = finite(d?.rain);
-    if ((precipRate !== null && precipRate > 0) || (rain !== null && rain > 0)) return "أمطار";
+    if (precipRate !== null && precipRate > 0) return "أمطار";
     if ((gust !== null && gust >= 50) || (wind !== null && wind >= 30)) return "رياح قوية";
     if (temp !== null) {
       if (temp >= 45) return "حار جدًا";
@@ -129,7 +129,31 @@
     }
     return "";
   }
-  function weatherCondition(d) { return providerCondition(d) || derivedCondition(d); }
+  function weatherCondition(d) {
+    const raw = d?.rawObservation || {};
+    const rate = finite(raw?.metric?.precipRate ?? d?.precipRate);
+    if (rate !== null && rate > 0) return "أمطار";
+    return providerCondition(d) || derivedCondition(d);
+  }
+  function conditionIcon(label, observedAt) {
+    const s = String(label || "").toLowerCase();
+    const night = (() => {
+      const hour = observedAt ? new Date(observedAt).getTime() : NaN;
+      const date = Number.isFinite(hour) ? new Date(hour) : new Date();
+      const h = Number(new Intl.DateTimeFormat("en-GB", { timeZone: cfg.timeZone || "Asia/Riyadh", hour: "2-digit", hourCycle:"h23" }).format(date));
+      return h < 6 || h >= 18;
+    })();
+    if (/رعد|thunder/.test(s)) return "⛈️";
+    if (/مطر|أمطار|rain|shower/.test(s)) return "🌧️";
+    if (/غبار|رمال|dust|sand/.test(s)) return "🌫️";
+    if (/ضباب|fog|mist/.test(s)) return "🌁";
+    if (/رياح|wind/.test(s)) return "💨";
+    if (/غائم|سحب|cloud/.test(s)) return night ? "☁️" : "⛅";
+    if (/صحو|مشمس|صافي|clear|sunny|fair/.test(s)) return night ? "🌙" : "☀️";
+    if (/حار|معتدل|بارد/.test(s)) return "🌡️";
+    return "🌤️";
+  }
+
   function calculatedFeelsLike(d) {
     const direct = finite(d?.feelsLike);
     if (direct !== null) return direct;
@@ -308,11 +332,21 @@
       const connected = d.stationConnected !== false;
       const readAt = d.observedAt ? formatUpdateTime(d.observedAt) : "—";
       connection.className = `station-connection ${connected ? "connected" : "disconnected"}`;
-      connection.querySelector(".connection-text").innerHTML = `${connected ? "المحطة متصلة" : "المحطة غير متصلة"} · <span class="connection-read-time">آخر قراءة: <span class="connection-read-time-value">${readAt}</span></span>`;
+      connection.querySelector(".connection-text").textContent = connected ? "المحطة متصلة" : "المحطة غير متصلة";
+      $("#stationLastRead").textContent = readAt;
 
       // ترتيب منطقي سريع القراءة على الجوال.
       const condition = weatherCondition(d) || "—";
-      addRow(dl, "🌤️ حالة الطقس الآن", condition);
+      const conditionRow = addRow(dl, "", condition);
+       conditionRow.classList.add("weather-condition-row");
+       const conditionValue = conditionRow.querySelector("dd");
+       const icon = document.createElement("span");
+       icon.className = "condition-icon";
+       icon.setAttribute("aria-hidden", "true");
+       icon.textContent = conditionIcon(condition, d.observedAt);
+       const desc = document.createElement("span");
+       desc.textContent = condition;
+       conditionValue.replaceChildren(icon, desc);
       const currentTempRow = addRow(dl, "🌡️ الحرارة الحالية", `${fmt(d.temperature)} °C`);
       styleCurrentTemperature(currentTempRow, d.temperature);
       addRow(dl, "🌡️ المحسوسة", `${fmt(calculatedFeelsLike(d))} °C`);
@@ -1101,7 +1135,7 @@
     currentRow.hidden = false;
     currentRow.classList.add("current-period");
     currentRow.setAttribute("aria-label", `الصلاة الحالية: ${names[state.currentKey]}`);
-    sourceRow.hidden = true;
+    // The current prayer remains visible in the complete timetable.
     focus.appendChild(currentRow); focus.hidden = false;
     const meter = document.createElement("span");
     meter.className = "prayer-countdown";

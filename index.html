@@ -8,7 +8,7 @@
   <meta name="description" content="نوافذ على الطقس والمعرفة وخدمات يومك؛ محطة قرب أبيار الماشي، وأوقات الصلاة والمصحف والأسعار والمسابقة.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌡️</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=0.24.10-mobile">
+  <link rel="stylesheet" href="styles.css?v=0.24.12-compact-prayer">
   <link rel="stylesheet" href="mushaf.css?v=0.24.6.4">
 </head>
 <body>
@@ -29,18 +29,18 @@
       <div class="weather-intro">
         <div class="weather-location-line">
           <p class="identity weather-location">📍 <strong>الموقع:</strong> <span id="stationLocation">—</span></p>
-          <span class="info-wrap">
-            <button id="weatherInfoButton" class="info-button" type="button" aria-label="معلومات مصدر الطقس" aria-expanded="false">ⓘ</button>
-            <span id="weatherInfoBubble" class="info-bubble weather-info-bubble" role="tooltip" hidden>المصدر: محطة طقس PWS مرتبطة بمنصة Weather Underground (WU)</span>
-          </span>
+          <span class="info-wrap"><button id="weatherInfoButton" class="info-button" type="button" aria-label="معلومات مصدر الطقس" aria-expanded="false">ⓘ</button><span id="weatherInfoBubble" class="info-bubble weather-info-bubble" role="tooltip" hidden>المصدر: محطة طقس PWS مرتبطة بمنصة Weather Underground (WU)</span></span>
         </div>
-        <p id="stationConnection" class="station-connection"><span class="connection-dot"></span><span class="connection-text">جارٍ التحقق من اتصال المحطة…</span></p>
+        <div id="stationConnection" class="station-connection loading" role="status">
+          <span class="station-state"><span class="connection-dot"></span><span class="connection-text">جارٍ التحقق من اتصال المحطة…</span></span>
+          <span class="station-last-read">آخر قراءة: <strong id="stationLastRead">—</strong></span>
+        </div>
         <p id="weatherStatus" class="status" hidden></p>
       </div>
       <div id="weatherViewSwitch" class="weather-view-switch" role="group" aria-label="عرض الطقس">
-        <button id="weatherCurrentButton" type="button" class="weather-view-button active" aria-pressed="true">الحالية</button>
+        <button id="weatherCurrentButton" type="button" class="weather-view-button active" aria-pressed="true">المحطة</button>
         <button id="weatherForecastButton" type="button" class="weather-view-button" aria-pressed="false">التوقعات</button>
-        <button id="weatherSatelliteButton" type="button" class="weather-view-button" aria-pressed="false">صورة فضائية</button>
+        <button id="weatherSatelliteButton" type="button" class="weather-view-button" aria-pressed="false">قمر صناعي</button>
       </div>
       </div>
       <div id="weatherCurrentView">
@@ -140,9 +140,9 @@
         </div>
         <p id="prayerDateSummary" class="date-summary">—</p>
       </div>
+      <dl id="prayerCurrent" class="rows prayer-current prayer-focus-card" aria-label="الصلاة الحالية" hidden></dl>
       <section class="simple-section prayer-section">
         <p id="prayerStatus" class="status">جارٍ جلب الأوقات…</p>
-        <dl id="prayerCurrent" class="rows prayer-current" aria-label="الصلاة الحالية" hidden></dl>
         <dl id="prayerData" class="rows prayer-rows prayer-table"></dl>
       </section>
 
@@ -260,7 +260,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="config.js?v=0.20.1"></script>
   <script src="markets-config.js?v=0.24.6"></script>
-  <script src="app.js?v=0.24.10-mobile"></script>
+  <script src="app.js?v=0.24.12-compact-prayer"></script>
   <script src="satellite.js?v=0.24.7-satellite"></script>
   <script src="radar.js?v=0.24.10-mobile"></script>
   <script src="mushaf.js?v=0.24.10-mobile"></script>

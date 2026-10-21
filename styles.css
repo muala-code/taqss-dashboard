@@ -831,3 +831,36 @@ html,body {touch-action:pan-x pan-y;}
 .nawafidh-picker-menu button:disabled {opacity:.4;}
 .nawafidh-picker-menu button:focus-visible,.nawafidh-picker-button:focus-visible {outline:2px solid #398a83;outline-offset:-2px;}
 @media(prefers-color-scheme:dark){#panel-markets .markets-update-time{color:#8bbaff;}}
+
+/* v0.24.11 — station status and current sky condition */
+.station-connection {display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.25rem .8rem;margin:.3rem 0 .1rem;opacity:1;font-size:.81rem;}
+.station-state {display:inline-flex;align-items:center;gap:.4rem;white-space:nowrap;font-weight:650;}
+.station-last-read {display:inline-flex;gap:.3rem;align-items:baseline;color:color-mix(in srgb, CanvasText 75%, Canvas);}
+.station-last-read strong {color:#2563eb;direction:ltr;unicode-bidi:isolate;font-weight:750;font-variant-numeric:tabular-nums;}
+.station-connection.connected .station-state {color:#15803d;}
+.station-connection.disconnected .station-state {color:#b91c1c;}
+.weather-rows > div.weather-condition-row {display:flex;align-items:center;justify-content:center;flex-direction:column;gap:.15rem;padding:.65rem .4rem;margin:.3rem 0 .35rem;background:color-mix(in srgb, #b8d5d5 15%, Canvas);border:1px solid color-mix(in srgb,#258a74 22%,transparent);border-radius:.65rem;}
+.weather-condition-row dt {font-size:.85rem;opacity:.75;}
+.weather-condition-row dd {display:flex;align-items:center;justify-content:center;gap:.5rem;font-size:1.12rem;font-weight:750;text-align:center;direction:rtl;}
+.weather-condition-row .condition-icon {font-size:1.65rem;line-height:1.3;}
+/* The prayer summary duplicates the active entry, never removes it from the timetable. */
+.prayer-current {margin:.45rem 0 .55rem;}
+.prayer-current > div {padding:.48rem .5rem;gap:.45rem;font-size:.92rem;}
+.prayer-current .prayer-countdown {height:5px;}
+.prayer-rows > div.current-period:not(.next-prayer) {grid-template-columns:minmax(0,1fr) auto;}
+@media (max-width:470px) {.station-connection {font-size:.75rem}.prayer-current > div {padding:.43rem .38rem;gap:.35rem;}}
+
+/* Countdown empties from the time (left) toward the prayer name (right). */
+#panel-prayer .prayer-countdown { direction: rtl; }
+
+/* v0.24.12: compact centered condition without redundant caption. */
+.weather-rows > div.weather-condition-row {padding:.36rem .4rem;margin:.22rem 0 .28rem;min-height:2.95rem;}
+.weather-condition-row dt {display:none;}
+.weather-condition-row dd {font-size:1.05rem;gap:.4rem;}
+.weather-condition-row .condition-icon {font-size:1.45rem;}
+/* Active prayer is a separate, visibly distinct card above the full timetable. */
+#panel-prayer .prayer-focus-card {display:block;margin:.6rem 0 .7rem;padding:.25rem .45rem;background:color-mix(in srgb,#16a085 14%,Canvas);border:1px solid color-mix(in srgb,#12856a 49%,Canvas);border-radius:.7rem;box-shadow:0 1px 3px #0000000a;}
+#panel-prayer .prayer-focus-card[hidden] {display:none!important;}
+#panel-prayer .prayer-focus-card > div {padding:.32rem .35rem;border:0;gap:.45rem;}
+#panel-prayer .prayer-focus-card .prayer-countdown {height:5px;}
+#panel-prayer .prayer-section {margin-top:.3rem;}
