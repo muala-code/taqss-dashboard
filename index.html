@@ -8,7 +8,7 @@
   <meta name="description" content="نوافذ على الطقس والمعرفة وخدمات يومك؛ محطة قرب أبيار الماشي، وأوقات الصلاة والمصحف والأسعار والمسابقة.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌡️</text></svg>">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=0.24.12-compact-prayer">
+  <link rel="stylesheet" href="styles.css?v=0.24.13-rain">
   <link rel="stylesheet" href="mushaf.css?v=0.24.6.4">
 </head>
 <body>
@@ -82,6 +82,7 @@
           <span class="chart-picker-chevron" aria-hidden="true">⌄</span>
         </button>
         <div id="chartPickerMenu" class="chart-picker-menu" role="listbox" aria-labelledby="chartPickerLabel" hidden>
+          <button type="button" role="option" data-chart="today-rain" aria-selected="false">المطر اليوم</button>
           <button type="button" role="option" data-chart="today-temp" aria-selected="true">الحرارة اليوم</button>
           <button type="button" role="option" data-chart="year-temp-rain" aria-selected="false">الحرارة والمطر سنويًا</button>
           <button type="button" role="option" data-chart="month-temp-dew" aria-selected="false">متوسط الحرارة ونقطة الندى شهريًا</button>
@@ -97,6 +98,21 @@
         <button id="chartPrev" type="button">السابق</button>
         <strong id="chartPeriodLabel">—</strong>
         <button id="chartNext" type="button">التالي</button>
+      </div>
+      <div id="rainControls" class="rain-controls" hidden>
+        <div class="rain-summary"><span>إجمالي اليوم <strong id="rainTotal">—</strong></span><span id="rainDateLabel"></span></div>
+        <div class="rain-tools">
+          <div id="rainDayPicker" class="rain-day-picker">
+            <button id="rainDayButton" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="rainDayOptions"><span id="rainDayButtonText">الأيام الممطرة</span><span aria-hidden="true">⌄</span></button>
+            <div id="rainDayMenu" class="rain-day-menu" hidden>
+              <div class="rain-year-nav"><button id="rainYearPrev" type="button" aria-label="السنة السابقة">السابق</button><strong id="rainYearLabel">—</strong><button id="rainYearNext" type="button" aria-label="السنة التالية">التالي</button></div>
+              <p id="rainDayStatus" role="status"></p>
+              <div id="rainDayOptions" role="listbox" aria-label="الأيام التي سجلت مطرًا"></div>
+            </div>
+          </div>
+          <button id="rainTodayButton" type="button">اليوم</button>
+        </div>
+        <p id="rainGapNote" class="rain-gap-note"></p>
       </div>
       <p id="chartStatus" class="status"></p>
       <table id="historyStats" class="history-stats" hidden>
@@ -260,7 +276,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="config.js?v=0.20.1"></script>
   <script src="markets-config.js?v=0.24.6"></script>
-  <script src="app.js?v=0.24.12-compact-prayer"></script>
+  <script src="rain.js?v=1.0.0"></script>
+  <script src="app.js?v=0.24.13-rain"></script>
   <script src="satellite.js?v=0.24.7-satellite"></script>
   <script src="radar.js?v=0.24.10-mobile"></script>
   <script src="mushaf.js?v=0.24.10-mobile"></script>

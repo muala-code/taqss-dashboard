@@ -559,6 +559,7 @@
     const requestVersion=++chartLoadVersion;
     ensureChartState();
     updatePeriodNav(kind);
+    window.NawafidhRain?.setVisible(kind==='today-rain',()=>loadChart('today-rain'));
     const status = $("#chartStatus");
     const canvas = $("#historyChart");
     status.textContent = "جارٍ جلب البيانات…";
@@ -568,7 +569,11 @@
     const now = riyadhNowParts();
     try {
       let data, spec;
-      if (kind === "year-stats") {
+      if (kind === 'today-rain') {
+        const rainView=await window.NawafidhRain.load({isCurrent:()=>requestVersion===chartLoadVersion});
+        if(!rainView||requestVersion!==chartLoadVersion)return;
+        chart=new Chart(canvas,rainView.spec);status.textContent=rainView.status;return;
+      } else if (kind === "year-stats") {
         data = await getHistoryJson(`${String(cfg.enrichmentApiBase || dashboardBase()).replace(/\/$/, "")}/api/history/stats?year=${chartState.year}`, kind);
         if(requestVersion!==chartLoadVersion)return;
         const box = $("#historyStats tbody"); box.replaceChildren();

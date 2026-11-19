@@ -864,3 +864,21 @@ html,body {touch-action:pan-x pan-y;}
 #panel-prayer .prayer-focus-card > div {padding:.32rem .35rem;border:0;gap:.45rem;}
 #panel-prayer .prayer-focus-card .prayer-countdown {height:5px;}
 #panel-prayer .prayer-section {margin-top:.3rem;}
+/* Rain history: custom picker supports touch, desktop and TV remotes. */
+.rain-controls[hidden],.rain-day-menu[hidden] {display:none!important;}
+.rain-controls {margin:.6rem 0;}
+.rain-summary {display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;font-size:.9rem;margin-bottom:.5rem;}
+.rain-summary strong {color:#386d8d;font-size:1.08rem;margin-inline-start:.35rem;font-variant-numeric:tabular-nums;}
+#rainDateLabel {color:#66766c;font-size:.82rem;}
+.rain-tools {display:flex;gap:.5rem;align-items:center;}
+.rain-tools button {font:inherit;color:inherit;background:Canvas;border:1px solid #bdccc4;border-radius:.45rem;padding:.45rem .7rem;min-height:40px;cursor:pointer;}
+.rain-day-picker {position:relative;min-width:0;flex:1;}
+#rainDayButton {display:flex;justify-content:space-between;align-items:center;gap:.5rem;width:100%;font-size:.86rem;}
+.rain-day-menu {position:absolute;z-index:50;inset-inline:0;top:calc(100% + 4px);background:Canvas;border:1px solid #bdccc4;border-radius:.5rem;box-shadow:0 8px 24px #0002;padding:.4rem;max-height:min(55vh,360px);overflow:auto;}
+.rain-year-nav {display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.2rem;}
+.rain-year-nav button {font-size:.78rem;padding:.25rem .5rem;}
+#rainDayStatus,.rain-gap-note {font-size:.79rem;line-height:1.65;margin:.4rem 0;color:#806227;}
+#rainDayStatus:empty,.rain-gap-note:empty {display:none;}
+#rainDayOptions button {display:block;width:100%;text-align:right;border:0;background:transparent;border-radius:.3rem;font-size:.86rem;}
+#rainDayOptions button[aria-selected=true],#rainDayOptions button:hover {background:#edf4f7;color:#386d8d;}
+.rain-tools button:focus-visible {outline:2px solid #386d8d;outline-offset:2px;}

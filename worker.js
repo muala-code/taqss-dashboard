@@ -448,12 +448,116 @@ async function cached(request,ctx,ttl,producer){
   const response=await producer(); if(response.ok&&ttl>0){ const clone=response.clone(); clone.headers.set('Cache-Control',`public, max-age=${ttl}`); ctx.waitUntil(cache.put(key,clone)); }
   return response;
 }
+// Rain API: raw PWS history/all precipTotal is the daily counter (mm).
+// Hourly precipitation rates are deliberately never integrated as amounts.
+const RAIN_API_VERSION = '1.0.0';
+function rainNumber(value) {
+  if(value===null||value===undefined||value==='')return null;
+  const n=Number(value);return Number.isFinite(n)&&n>=0?n:null;
+}
+function rainRound(n){return Math.round(n*1000)/1000;}
+function rainStamp(row){
+  if(rainNumber(row?.epoch)!==null){const epoch=Number(row.epoch);return epoch>1e12?epoch:epoch*1000;}
+  let value=row?.obsTimeUtc||row?.obsTimeLocal;
+  if(typeof value!=='string')return null;
+  value=value.replace(' ','T');if(!/(Z|[+-]\d{2}:?\d{2})$/i.test(value))value+=row.obsTimeUtc?'Z':'+03:00';
+  const ms=Date.parse(value);return Number.isFinite(ms)?ms:null;
+}
+function rainCounter(row){return rainNumber(row?.metric?.precipTotal??row?.precipTotal);}
+function rainBuildDay(date, observations, dailyTotal=null, expectedMinutes=5){
+  const midnight=Date.parse(date+'T00:00:00+03:00'),end=midnight+86400000;
+  const sorted=[...new Map(observations.map(row=>({time:rainStamp(row),counter:rainCounter(row)}))
+    .filter(p=>p.time!==null&&p.time>=midnight&&p.time<end&&p.counter!==null).map(p=>[p.time,p])).values()].sort((a,b)=>a.time-b.time);
+  const cadence=Math.max(1,Math.min(15,Number(expectedMinutes)||5))*60000;
+  const gapThreshold=cadence*3,periods=[],gaps=[],resets=[];
+  let prev={time:midnight,counter:0},amountSum=0;
+  for(const point of sorted){
+    const duration=point.time-prev.time;
+    const outage=duration>gapThreshold;
+    if(outage)gaps.push({from:prev.time,to:point.time});
+    const delta=rainRound(point.counter-prev.counter);
+    if(delta<-.001){resets.push({from:prev.time,to:point.time});if(!outage)gaps.push({from:prev.time,to:point.time,reason:'counterReset'});}
+    else if(delta>0){
+      const uncertain=outage||point.time===midnight;
+      periods.push({from:prev.time,to:point.time,amount:delta,uncertain});amountSum+=delta;
+    }
+    prev=point;
+  }
+  const summary=rainNumber(dailyTotal),last=sorted.at(-1);
+  const total=summary??(resets.length?null:last?.counter??null);
+  const measuredTotal=rainRound(amountSum);
+  const mismatch=total!==null&&Math.abs(total-measuredTotal)>.051;
+  return {date,midnight,lastObservedAt:last?new Date(last.time).toISOString():null,
+    total,totalSource:summary!==null?'dailySummary':total!==null?'dailyCounter':'unavailable',
+    intervalTotal:measuredTotal,unallocated:total!==null?Math.max(0,rainRound(total-measuredTotal)):null,
+    periods,gaps,resets,consistent:total!==null&&!mismatch&&!resets.length,
+    expectedIntervalMinutes:cadence/60000,sampleCount:sorted.length,rainKind:'dailyCounterDifferences',version:RAIN_API_VERSION};
+}
+function rainToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
+function rainValidDate(value){return /^\d{4}-\d{2}-\d{2}$/.test(value)&&!Number.isNaN(Date.parse(value+'T12:00:00Z'))&&new Date(value+'T12:00:00Z').toISOString().slice(0,10)===value&&value>='2026-07-01'&&value<=rainToday();}
+async function rainReadWU(env,path,params){
+  const url=new URL('https://api.weather.com/v2/pws/'+path);
+  for(const [k,v] of Object.entries({stationId:stationId(env),format:'json',units:'m',numericPrecision:'decimal',...params,apiKey:wuKey(env)}))url.searchParams.set(k,v);
+  return fetchJson(url.toString(),{headers:{Accept:'application/json'},signal:AbortSignal.timeout(15000)});
+}
+async function rainFetchDay(env,date){
+  if(!wuKey(env))return json({error:'أضف WU_API_KEY في عامل نوافذ لتفعيل سجل المطر.'},503);
+  if(!rainValidDate(date))return json({error:'اختر تاريخًا صحيحًا من يوليو 2026 حتى اليوم.'},400);
+  const key=date.replaceAll('-','');
+  const [detail,summary]=await Promise.allSettled([
+    rainReadWU(env,'history/all',{date:key}),
+    rainReadWU(env,'history/daily',{startDate:key,endDate:key})
+  ]);
+  const raw=detail.status==='fulfilled'?rows(detail.value):[];
+  const daily=summary.status==='fulfilled'?rows(summary.value).find(r=>String(r.obsTimeLocal||'').slice(0,10)===date):null;
+  const result=rainBuildDay(date,raw,rainCounter(daily),env.RAIN_INTERVAL_MINUTES);
+  if(!result.sampleCount&&result.total===null)return json({error:'تعذر جلب سجل المطر لهذا اليوم. أعد المحاولة لاحقًا.'},502);
+  result.detailAvailable=Boolean(result.sampleCount);
+  result.partial=detail.status==='rejected'||!result.consistent;
+  return json(result,200,date===rainToday()||result.partial?300:86400);
+}
+async function rainMonthDays(env,year,month,ctx){
+  const today=rainToday(),prefix=`${year}-${String(month).padStart(2,'0')}`;
+  const cacheKey=new Request(`https://rain-cache.invalid/v${RAIN_API_VERSION}/${stationId(env)}/${prefix}`);
+  const cachedMonth=await caches.default.match(cacheKey);if(cachedMonth)return cachedMonth.json();
+  const end=prefix===today.slice(0,7)?Number(today.slice(8,10)):new Date(Date.UTC(year,month,0)).getUTCDate();
+  const data=await rainReadWU(env,'history/daily',{startDate:`${year}${String(month).padStart(2,'0')}01`,endDate:`${year}${String(month).padStart(2,'0')}${String(end).padStart(2,'0')}`});
+  const valid=rows(data).map(r=>({date:String(r.obsTimeLocal||'').slice(0,10),total:rainCounter(r)})).filter(p=>rainValidDate(p.date)&&p.date.startsWith(prefix));
+  const result={days:valid.filter(p=>p.total!==null&&p.total>0),partial:new Set(valid.map(p=>p.date)).size<end||valid.some(p=>p.total===null)};
+  // Do not cache empty/unverified source responses as a known dry month.
+  if(!result.partial)ctx.waitUntil(caches.default.put(cacheKey,new Response(JSON.stringify(result),{headers:{'Content-Type':'application/json','Cache-Control':`public,max-age=${prefix===today.slice(0,7)?900:86400}`}})));
+  return result;
+}
+async function rainFetchDays(env,yearValue,ctx){
+  if(!wuKey(env))return json({error:'أضف WU_API_KEY في عامل نوافذ لتفعيل سجل المطر.'},503);
+  const today=rainToday(),currentYear=Number(today.slice(0,4)),year=Number(yearValue||currentYear);
+  if(!Number.isInteger(year)||year<2026||year>currentYear)return json({error:'السنة غير صالحة.'},400);
+  const first=year===2026?7:1,last=year===currentYear?Number(today.slice(5,7)):12;
+  const months=Array.from({length:last-first+1},(_,i)=>first+i),days=[],failedMonths=[];
+  let successful=0;
+  // Bounded concurrency; each month gets a shared edge cache.
+  for(let i=0;i<months.length;i+=3){
+    const results=await Promise.allSettled(months.slice(i,i+3).map(m=>rainMonthDays(env,year,m,ctx)));
+    results.forEach((r,j)=>{if(r.status==='fulfilled'){successful++;days.push(...r.value.days);if(r.value.partial)failedMonths.push(months[i+j]);}else failedMonths.push(months[i+j]);});
+  }
+  if(!successful)return json({error:'تعذر جلب الأيام الممطرة. أعد المحاولة لاحقًا.'},502);
+  return json({year,days:[...new Map(days.map(p=>[p.date,p])).values()].sort((a,b)=>b.date.localeCompare(a.date)),partial:failedMonths.length>0,failedMonths,version:RAIN_API_VERSION},200,failedMonths.length?0:900);
+}
+
+async function rainCachedDay(request,env,ctx,date){
+  const url=new URL(request.url);url.search='';url.searchParams.set('date',date);url.searchParams.set('v',RAIN_API_VERSION);
+  const cacheKey=new Request(url.toString());const hit=await caches.default.match(cacheKey);if(hit)return hit;
+  const response=await rainFetchDay(env,date);if(response.ok)ctx.waitUntil(caches.default.put(cacheKey,response.clone()));return response;
+}
+
 export default {
   async fetch(request,env,ctx){
     if(request.method==='OPTIONS') return new Response(null,{status:204,headers:corsHeaders()});
     const url=new URL(request.url);
     if(!['GET','HEAD'].includes(request.method)) return json({error:'Method not allowed'},405);
     try{
+      if(url.pathname==='/api/rain/day') { const date=url.searchParams.get('date')||rainToday(); if(!rainValidDate(date))return json({error:'التاريخ غير صالح.'},400); return rainCachedDay(request,env,ctx,date); }
+      if(url.pathname==='/api/rain/days') return rainFetchDays(env,url.searchParams.get('year'),ctx);
       if(url.pathname==='/api/weather') return cached(request,ctx,55,()=>apiWeather(env));
       if(url.pathname==='/api/history/today'||url.pathname==='/api/history') return cached(request,ctx,300,()=>apiToday(env));
       if(url.pathname==='/api/history/month') return cached(request,ctx,900,()=>apiMonth(env,url.searchParams.get('year'),url.searchParams.get('month')));
