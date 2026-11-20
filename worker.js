@@ -204,6 +204,27 @@ async function missingSessionReference(symbol, expectedName, effectiveTs, offset
   }
   return null;
 }
+// TASI may expose only the current daily candle. Use the hourly META
+// previousClose only when instrument, session, timestamp and quote agree.
+// Neither chartPreviousClose nor the last hourly candle is a prior close.
+async function tasiSessionReference(symbol, expectedName, effectiveTs, quotePrice, offset){
+  if(String(symbol).toUpperCase()!=='^TASI.SR'||!expectedName||!positiveFinite(quotePrice)||!Number.isFinite(effectiveTs))return null;
+  for(const base of ['https://query1.finance.yahoo.com','https://query2.finance.yahoo.com']){
+    try{
+      const url=`${base}/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1h&includePrePost=false`;
+      const data=await fetchJson(url,{headers:{'User-Agent':'Mozilla/5.0','Accept':'application/json'},cf:{cacheEverything:true,cacheTtl:60}});
+      const m=data?.chart?.result?.[0]?.meta;
+      if(!m||m.shortName!==expectedName||String(m.symbol||'').toUpperCase()!=='^TASI.SR')continue;
+      const marketTs=positiveFinite(m.regularMarketTime),price=positiveFinite(m.regularMarketPrice),previous=positiveFinite(m.previousClose);
+      if(marketTs===null||price===null||previous===null)continue;
+      if(!sameMarketDay(marketTs,effectiveTs,offset)||Math.abs(marketTs-effectiveTs)>300)continue;
+      if(Math.abs(price-quotePrice)>Math.max(.01,quotePrice*.0001))continue;
+      return {previous,source:'yahooTasiHourlyMetaPreviousClose'};
+    }catch{} // Keep the reference unavailable when it cannot be checked.
+  }
+  return null;
+}
+
 // Exceptional check ONLY for suspicious commodity reference differences.
 // Cross-check two Yahoo chart intervals for the same ticker, named instrument
 // and market timestamp. This does not independently prove contract identity.
@@ -300,6 +321,7 @@ async function yahooOne(symbol){
         marketTs!==null && last.ts<marketTs && !sameMarketDay(last.ts,marketTs,offset);
       let prev;
       let referenceSource;
+      let indexHourlyReference=null;
       const missingDailySession=Boolean(prior && dailyAligned && !laterDaily &&
         missingBusinessSession(prior.ts,session.ts,offset,symbol));
       const quoteHasMissingSession=quoteNewerThanDaily &&
@@ -327,6 +349,11 @@ async function yahooOne(symbol){
         prev=metaPreviousClose;referenceSource='yahooCommodityPreviousClose';
       }
       else if(prior && dailyAligned){prev=prior.close;referenceSource='dailyPrior';}
+      else if(String(symbol).toUpperCase()==='^TASI.SR' && metaSameSession){
+        indexHourlyReference=await tasiSessionReference(symbol,m.shortName,effectiveTs,price,offset);
+        prev=indexHourlyReference?.previous??null;
+        referenceSource=indexHourlyReference?.source??'saudiNoVerifiedDailyReference';
+      }
       else if(saudi){prev=null;referenceSource='saudiNoVerifiedDailyReference';}
       else if(metaPrev!==null){prev=metaPrev;referenceSource='yahooMeta';}
       else if(prior){prev=prior.close;referenceSource='dailyPriorUnverified';}
@@ -387,10 +414,11 @@ async function yahooOne(symbol){
         potentialContractRollover:potentialContractRollover||commodityReferenceConflict,
         commodityReferenceConflict,
         missingDailySession,
-        hourlyReferenceVerified:Boolean(fallback),
+        hourlyReferenceVerified:Boolean(fallback||indexHourlyReference),
         missingSessionCorporateAction:Boolean(gapHasSplit),
         diagnostic:{yahooPreviousClose:metaPreviousClose,chartPreviousClose,
           commodityHourlyPreviousClose,
+          tasiHourlyPreviousClose:indexHourlyReference?.previous??null,
           dailyPriorClose:prior?.close??null,latestDailyClose:last.close,
           dailyQuoteAligned:dailyAligned,quoteNewerThanDaily,quoteHasMissingSession,
           sessionDetailsSource:suppressStaleDetails?(intraday?.source??(validMetaDetails?'yahooMetaSameSession':'withheldUnverified')):'dailyBar',
